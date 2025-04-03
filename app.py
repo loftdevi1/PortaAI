@@ -275,6 +275,12 @@ def show_portfolio_input_screen():
                     "amount": investment_amount,
                     "type": "Stock/ETF"
                 })
+                
+                # Auto-save if user is logged in and has a current portfolio
+                if st.session_state[SESSION_KEYS.IS_LOGGED_IN] and st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID]:
+                    save_current_portfolio_to_database()
+                    st.success("Portfolio automatically saved!")
+                
                 st.rerun()
     
     with tab2:
@@ -319,6 +325,12 @@ def show_portfolio_input_screen():
                     "months_invested": months_invested,
                     "type": "SIP"
                 })
+                
+                # Auto-save if user is logged in and has a current portfolio
+                if st.session_state[SESSION_KEYS.IS_LOGGED_IN] and st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID]:
+                    save_current_portfolio_to_database()
+                    st.success("Portfolio automatically saved!")
+                
                 st.rerun()
     
     col1, col2, col3 = st.columns(3)
@@ -326,6 +338,12 @@ def show_portfolio_input_screen():
     with col1:
         if st.button("Clear Portfolio", use_container_width=True):
             st.session_state[SESSION_KEYS.PORTFOLIO] = []
+            
+            # Auto-save the empty portfolio if user is logged in and has a current portfolio
+            if st.session_state[SESSION_KEYS.IS_LOGGED_IN] and st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID]:
+                save_current_portfolio_to_database()
+                st.success("Portfolio cleared and saved!")
+                
             st.rerun()
     
     with col2:
