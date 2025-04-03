@@ -3,10 +3,12 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import hashlib
+import datetime
 from utils import SESSION_KEYS, initialize_session_state, get_risk_profile_allocation, get_asset_category_color
 from portfolio_analyzer import analyze_portfolio, get_allocation_recommendation
 from stock_service import get_stock_suggestions, fetch_stock_data, get_sip_suggestions
 import database as db
+import goals as goal_utils
 
 def main():
     # Set up page configuration
@@ -40,13 +42,13 @@ def main():
                 navigation = st.radio(
                     "Navigation",
                     ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
-                     "Recommendations", "Stock Selection", "Summary", "Portfolio Management"],
+                     "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals"],
                     index=st.session_state[SESSION_KEYS.NAVIGATION_INDEX]
                 )
                 
                 # Update navigation state based on selection
                 nav_options = ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
-                              "Recommendations", "Stock Selection", "Summary", "Portfolio Management"]
+                              "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals"]
                 st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = nav_options.index(navigation)
             else:
                 # Limited navigation if no risk profile yet
@@ -129,6 +131,8 @@ def main():
             show_summary_screen()
         elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 7:
             show_portfolio_management_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 8:
+            show_financial_goals_screen()
 
 def show_welcome_screen():
     st.title("Welcome to PortaAi")
@@ -962,6 +966,191 @@ def load_portfolio_from_database(portfolio_id):
             st.session_state[SESSION_KEYS.RISK_PROFILE] = user.risk_profile
     
     return True
+
+def show_financial_goals_screen():
+    """
+    Display the financial goals screen where users can create and track their financial goals
+    """
+    st.title("Financial Goals Planning")
+    
+    # Check if user is logged in
+    if not st.session_state[SESSION_KEYS.IS_LOGGED_IN]:
+        st.warning("Please login to use the financial goals feature")
+        if st.button("Go to Login"):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 0
+            st.rerun()
+        return
+    
+    # Create tabs for different sections
+    tab1, tab2, tab3 = st.tabs(["My Goals", "Create New Goal", "Goal-Based Portfolio"])
+    
+    with tab1:
+        st.subheader("Your Financial Goals")
+        
+        # Fetch user's goals
+        user_id = st.session_state[SESSION_KEYS.USER_ID]
+        user_goals = goal_utils.get_user_goals(user_id)
+        
+        if not user_goals:
+            st.info("You don't have any financial goals yet. Create one to get started!")
+        else:
+            # Display each goal as a card with progress
+            for goal in user_goals:
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    # Calculate progress percentage
+                    progress = goal_utils.calculate_goal_progress_percentage(goal.current_amount, goal.target_amount)
+                    
+                    # Calculate remaining time
+                    now = datetime.datetime.utcnow()
+                    days_remaining = (goal.target_date - now).days
+                    years_remaining = max(0, days_remaining / 365)
+                    
+                    # Create an expander for each goal
+                    with st.expander(f"**{goal.name}** - ${goal.target_amount:,.2f}", expanded=True):
+                        st.markdown(f"**Description:** {goal.description}")
+                        st.markdown(f"**Target Date:** {goal.target_date.strftime('%b %d, %Y')} ({days_remaining} days remaining)")
+                        st.markdown(f"**Risk Level:** {goal.risk_level}")
+                        
+                        # Progress bar
+                        st.progress(progress / 100)
+                        st.markdown(f"**Progress:** ${goal.current_amount:,.2f} of ${goal.target_amount:,.2f} ({progress:.1f}%)")
+                        
+                        # Monthly investment required
+                        expected_return = goal_utils.get_expected_return_rate(goal.risk_level)
+                        monthly_needed = goal_utils.calculate_monthly_investment_needed(
+                            goal.target_amount, goal.current_amount, years_remaining, expected_return
+                        )
+                        
+                        st.markdown(f"**Suggested Monthly Investment:** ${monthly_needed:,.2f}")
+                        
+                        # Update progress form
+                        with st.form(key=f"update_goal_{goal.id}"):
+                            new_amount = st.number_input("Current Amount", 
+                                                        min_value=0.0, 
+                                                        value=float(goal.current_amount),
+                                                        step=100.0)
+                            
+                            update_submitted = st.form_submit_button("Update Progress")
+                            if update_submitted:
+                                if goal_utils.update_goal_progress(goal.id, new_amount):
+                                    st.success("Goal progress updated!")
+                                    st.rerun()
+                
+                with col2:
+                    # Delete goal button
+                    if st.button("Delete", key=f"delete_{goal.id}"):
+                        if goal_utils.delete_goal(goal.id):
+                            st.success("Goal deleted successfully!")
+                            st.rerun()
+    
+    with tab2:
+        st.subheader("Create a New Financial Goal")
+        
+        with st.form("create_goal_form"):
+            goal_name = st.text_input("Goal Name", placeholder="e.g., Retirement, Home Purchase, Education")
+            
+            goal_description = st.text_area("Description", placeholder="Describe your financial goal")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                target_amount = st.number_input("Target Amount ($)", min_value=1000.0, step=1000.0)
+            
+            with col2:
+                timeline_years = st.number_input("Timeline (Years)", min_value=1, step=1)
+            
+            risk_level = st.select_slider(
+                "Risk Level",
+                options=["Low", "Medium", "High"],
+                value="Medium"
+            )
+            
+            create_goal = st.form_submit_button("Create Goal")
+            
+            if create_goal and goal_name and target_amount > 0 and timeline_years > 0:
+                user_id = st.session_state[SESSION_KEYS.USER_ID]
+                try:
+                    goal_id = goal_utils.create_financial_goal(
+                        user_id=user_id,
+                        name=goal_name,
+                        description=goal_description,
+                        target_amount=target_amount,
+                        timeline_years=timeline_years,
+                        risk_level=risk_level
+                    )
+                    if goal_id:
+                        st.success("Financial goal created successfully!")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Error creating goal: {e}")
+    
+    with tab3:
+        st.subheader("Goal-Based Portfolio Allocation")
+        
+        # Input form for goal parameters
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            goal_timeline = st.slider("Goal Timeline (Years)", min_value=1, max_value=30, value=10)
+        
+        with col2:
+            goal_risk = st.select_slider(
+                "Risk Tolerance",
+                options=["Low", "Medium", "High"],
+                value="Medium"
+            )
+        
+        # Get allocation recommendation based on goal parameters
+        allocation = goal_utils.get_goal_based_allocation(goal_risk, goal_timeline)
+        
+        # Display allocation chart
+        fig = px.pie(
+            names=list(allocation.keys()),
+            values=list(allocation.values()),
+            title=f"Recommended Allocation for {goal_timeline} Year Goal with {goal_risk} Risk",
+            color=list(allocation.keys()),
+            color_discrete_map=get_asset_category_color()
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Display allocation details
+        st.subheader("Allocation Details")
+        
+        # Create a DataFrame for better display
+        allocation_df = pd.DataFrame({
+            "Category": allocation.keys(),
+            "Allocation (%)": allocation.values()
+        })
+        
+        st.dataframe(allocation_df.set_index("Category"), use_container_width=True)
+        
+        # Additional guidance
+        st.subheader("Investment Strategy Guidance")
+        
+        if goal_timeline < 5:
+            st.info("For short-term goals (less than 5 years), focus on capital preservation and liquidity. Consider more conservative investments like fixed income assets and high-quality bonds.")
+        elif goal_timeline < 15:
+            st.info("For medium-term goals (5-15 years), you can afford some market volatility. A balanced portfolio with both growth assets and income-generating investments is recommended.")
+        else:
+            st.info("For long-term goals (15+ years), you can take advantage of market growth over time. Focus on growth-oriented investments with potentially higher returns, as you have time to recover from market downturns.")
+        
+        # Expected returns
+        expected_return = goal_utils.get_expected_return_rate(goal_risk)
+        st.markdown(f"**Expected Annual Return Rate:** {expected_return*100:.1f}%")
+        
+        # Example calculation
+        st.subheader("Sample Goal Calculation")
+        
+        example_goal = st.number_input("Example Goal Amount", min_value=1000.0, value=100000.0, step=1000.0)
+        example_current = st.number_input("Current Savings", min_value=0.0, value=0.0, step=1000.0)
+        
+        monthly_investment = goal_utils.calculate_monthly_investment_needed(
+            example_goal, example_current, goal_timeline, expected_return
+        )
+        
+        st.success(f"To reach your ${example_goal:,.2f} goal in {goal_timeline} years, you need to invest approximately **${monthly_investment:,.2f} per month**.")
 
 def save_current_portfolio_to_database():
     """Save the current portfolio to the database"""

@@ -9,6 +9,11 @@ class SESSION_KEYS:
     SELECTED_SIPS = "selected_sips"
     MARKET = "market"
     
+    # Financial goals related keys
+    FINANCIAL_GOALS = "financial_goals"
+    CURRENT_GOAL_ID = "current_goal_id"
+    CURRENT_GOAL_NAME = "current_goal_name"
+    
     # Database related keys
     USER_ID = "user_id"
     USER_NAME = "user_name"
@@ -72,6 +77,16 @@ def initialize_session_state():
         
     if SESSION_KEYS.USER_PORTFOLIOS not in st.session_state:
         st.session_state[SESSION_KEYS.USER_PORTFOLIOS] = []
+    
+    # Financial goals state
+    if SESSION_KEYS.FINANCIAL_GOALS not in st.session_state:
+        st.session_state[SESSION_KEYS.FINANCIAL_GOALS] = []
+        
+    if SESSION_KEYS.CURRENT_GOAL_ID not in st.session_state:
+        st.session_state[SESSION_KEYS.CURRENT_GOAL_ID] = None
+        
+    if SESSION_KEYS.CURRENT_GOAL_NAME not in st.session_state:
+        st.session_state[SESSION_KEYS.CURRENT_GOAL_NAME] = None
 
 def get_risk_profile_allocation(risk_profile):
     """
