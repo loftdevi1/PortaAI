@@ -309,9 +309,6 @@ def analyze_sector_exposure(portfolio):
     diversification_score = max(0, min(100, 100 * (1 - hhi)))
     result["diversification_score"] = round(diversification_score, 1)
     
-    # Generate recommendations based on sector exposure
-    recommendations = []
-    
     # Get S&P 500 sector weights as a benchmark (approximate values)
     sp500_sectors = {
         "Information Technology": 0.28,
@@ -326,6 +323,58 @@ def analyze_sector_exposure(portfolio):
         "Real Estate": 0.03,
         "Materials": 0.03
     }
+    
+    # Create a sector chart
+    if sector_weights:
+        # Convert to percentage for better readability
+        sector_percents = {sector: weight * 100 for sector, weight in sector_weights.items()}
+        
+        # Create chart data
+        fig = px.pie(
+            names=list(sector_percents.keys()),
+            values=list(sector_percents.values()),
+            title="Portfolio Sector Allocation",
+            hole=0.4,
+        )
+        fig.update_traces(textposition='inside', textinfo='percent+label')
+        fig.update_layout(
+            legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+        )
+        
+        # Add benchmark comparison if available
+        if len(sector_weights) > 1:
+            # Create bar chart for comparison with benchmark
+            sectors = list(sector_weights.keys())
+            portfolio_values = [sector_weights[s] * 100 for s in sectors]
+            benchmark_values = [sp500_sectors.get(s, 0) * 100 for s in sectors]
+            
+            comp_fig = px.bar(
+                x=sectors,
+                y=[portfolio_values, benchmark_values],
+                barmode='group',
+                labels={"value": "Allocation (%)", "variable": "Source"},
+                title="Portfolio vs. Benchmark Sector Allocation",
+                color_discrete_sequence=["rgb(0, 112, 192)", "rgb(192, 0, 0)"]
+            )
+            comp_fig.update_layout(
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=-0.3,
+                    xanchor="center",
+                    x=0.5
+                ),
+                xaxis_tickangle=-45
+            )
+            
+            # Add both charts to result
+            result["sector_chart"] = fig
+            result["comparison_chart"] = comp_fig
+        else:
+            result["sector_chart"] = fig
+    
+    # Generate recommendations based on sector exposure
+    recommendations = []
     
     # Compare portfolio sector allocation to benchmark
     for sector, benchmark_weight in sp500_sectors.items():
@@ -352,6 +401,79 @@ def analyze_sector_exposure(portfolio):
     })
     
     result["chart_data"] = chart_data
+    
+    # Create concentration metrics for UI display
+    if sector_weights:
+        top_sector = max(sector_weights.items(), key=lambda x: x[1])
+        top_sector_name = top_sector[0]
+        top_sector_allocation = round(top_sector[1] * 100, 1)
+        
+        # Calculate diversity score on a scale of 0-10 for easier understanding
+        diversity_score = min(10, diversification_score / 10)
+        
+        # Determine if the diversification is improving or worsening
+        # Using 7 as a moderate benchmark (70% on the original scale)
+        diversity_delta = "+" if diversity_score >= 7 else "-"
+        
+        result["concentration_metrics"] = {
+            "top_sector": top_sector_name,
+            "top_allocation": top_sector_allocation,
+            "diversification_score": round(diversity_score, 1),
+            "diversification_delta": diversity_delta,
+            "sectors_count": len(sector_weights)
+        }
+        
+        # Create insights list for UI
+        insights = []
+        
+        # Diversification insight
+        if diversity_score < 5:
+            insights.append({
+                "type": "warning",
+                "message": "Your portfolio has low sector diversification, which may increase volatility. Consider adding investments across more sectors."
+            })
+        elif diversity_score >= 8:
+            insights.append({
+                "type": "success",
+                "message": "Your portfolio has excellent sector diversification, which helps reduce risk during sector-specific downturns."
+            })
+        else:
+            insights.append({
+                "type": "info",
+                "message": "Your portfolio has moderate sector diversification. You may benefit from adding exposure to a few more sectors."
+            })
+        
+        # Concentration insight
+        if top_sector_allocation > 40:
+            insights.append({
+                "type": "warning",
+                "message": f"Your portfolio is highly concentrated in {top_sector_name} ({top_sector_allocation}%). This increases sector-specific risk."
+            })
+        
+        # Add sector-specific insights
+        tech_weight = sector_weights.get("Information Technology", 0) * 100
+        financial_weight = sector_weights.get("Financials", 0) * 100
+        healthcare_weight = sector_weights.get("Health Care", 0) * 100
+        
+        if tech_weight > 35:
+            insights.append({
+                "type": "info",
+                "message": f"Technology exposure is high ({tech_weight:.1f}%). Consider how tech regulation or slowdown would impact your portfolio."
+            })
+        
+        if financial_weight > 25:
+            insights.append({
+                "type": "info",
+                "message": f"Financial sector exposure is high ({financial_weight:.1f}%). This sector is sensitive to interest rate changes."
+            })
+        
+        if healthcare_weight < 5 and financial_weight > 0:
+            insights.append({
+                "type": "info",
+                "message": "Consider adding healthcare investments for more defensive exposure during market downturns."
+            })
+        
+        result["insights"] = insights
     
     return result
 
@@ -477,8 +599,8 @@ def generate_economic_scenario_analysis(portfolio, time_horizon_years=5):
     
     # Calculate expected value across all scenarios (probability-weighted average)
     expected_value = sum(
-        result["final_value"] * result["probability"] 
-        for result in scenario_results.values()
+        scenario_data["final_value"] * scenario_data["probability"] 
+        for scenario_data in scenario_results.values()
     )
     
     # Create chart data for visualization

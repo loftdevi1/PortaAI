@@ -2090,14 +2090,20 @@ def show_advanced_analytics_screen():
         including recession, high inflation, market boom, and normal market conditions.
         """)
         
-        # Check if scenario analysis is in session
-        if not st.session_state[SESSION_KEYS.ECONOMIC_SCENARIO_ANALYSIS]:
+        # Check if scenario analysis is in session or time horizon has changed
+        time_horizon = st.session_state.get("last_prediction_horizon", 5)
+        
+        if not st.session_state[SESSION_KEYS.ECONOMIC_SCENARIO_ANALYSIS] or \
+           st.session_state.get("last_scenario_horizon", 5) != time_horizon:
+            
             with st.spinner("Generating economic scenario analysis..."):
                 # Call scenario analysis function from advanced_analytics.py
                 scenario_analysis = generate_economic_scenario_analysis(
-                    st.session_state[SESSION_KEYS.PORTFOLIO]
+                    st.session_state[SESSION_KEYS.PORTFOLIO],
+                    time_horizon_years=time_horizon
                 )
                 st.session_state[SESSION_KEYS.ECONOMIC_SCENARIO_ANALYSIS] = scenario_analysis
+                st.session_state["last_scenario_horizon"] = time_horizon
         
         scenario_analysis = st.session_state[SESSION_KEYS.ECONOMIC_SCENARIO_ANALYSIS]
         
