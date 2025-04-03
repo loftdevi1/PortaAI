@@ -1,0 +1,36 @@
+sqlalchemy.exc.ArgumentError: Textual SQL expression 'SELECT 1' should be explicitly declared as text('SELECT 1')
+Traceback:
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 640, in code_to_exec
+    exec(code, module.__dict__)
+File "/home/runner/workspace/app.py", line 2281, in <module>
+    main()
+File "/home/runner/workspace/app.py", line 121, in main
+    show_login_screen()
+File "/home/runner/workspace/app.py", line 806, in show_login_screen
+    user = db.get_user_by_username(username)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/database.py", line 162, in get_user_by_username
+    session = get_session()
+              ^^^^^^^^^^^^^
+File "/home/runner/workspace/database.py", line 46, in get_session
+    session.execute("SELECT 1")
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2365, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2149, in _execute_internal
+    statement = coercions.expect(roles.StatementRole, statement)
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/sql/coercions.py", line 395, in expect
+    resolved = impl._literal_coercion(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/sql/coercions.py", line 621, in _literal_coercion
+    return self._text_coercion(element, argname, **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/sql/coercions.py", line 614, in _text_coercion
+    return _no_text_coercion(element, argname)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/sql/coercions.py", line 584, in _no_text_coercion
+    raise exc_cls(

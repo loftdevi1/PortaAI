@@ -1,6 +1,6 @@
 import os
 import json
-from sqlalchemy import create_engine, Column, Integer, String, Float, Text, DateTime, Boolean, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Float, Text, DateTime, Boolean, ForeignKey, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 import datetime
@@ -43,7 +43,7 @@ def get_session():
         try:
             session = Session()
             # Test connection with a simple query to ensure it's working
-            session.execute("SELECT 1")
+            session.execute(text("SELECT 1"))
             return session
         except Exception as e:
             if attempt < max_retries - 1:
