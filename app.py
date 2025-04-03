@@ -16,6 +16,13 @@ from ai_recommendations import (
     generate_tax_optimization_advice,
     analyze_portfolio_strengths_weaknesses
 )
+from advanced_analytics import (
+    predict_portfolio_performance,
+    analyze_sector_exposure,
+    generate_economic_scenario_analysis,
+    calculate_modern_portfolio_theory_metrics,
+    get_ai_portfolio_insights
+)
 
 def main():
     # Set up page configuration
