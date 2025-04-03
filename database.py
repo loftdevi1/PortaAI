@@ -28,7 +28,7 @@ Session = sessionmaker(bind=engine)
 def get_session():
     """Get a new session with error handling and connection retry"""
     try:
-        session = get_session()
+        session = Session()
         return session
     except Exception as e:
         print(f"Error creating database session: {e}")
