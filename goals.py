@@ -106,6 +106,22 @@ def delete_goal(goal_id):
     finally:
         session.close()
 
+def update_goal_risk_level(goal_id, risk_level):
+    """Update the risk level for a goal"""
+    session = Session()
+    try:
+        goal = session.query(FinancialGoal).filter_by(id=goal_id).first()
+        if goal:
+            goal.risk_level = risk_level
+            session.commit()
+            return True
+        return False
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
+
 # Create the table if it doesn't exist
 Base.metadata.create_all(engine)
 

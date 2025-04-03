@@ -1087,70 +1087,211 @@ def show_financial_goals_screen():
                     st.error(f"Error creating goal: {e}")
     
     with tab3:
-        st.subheader("Goal-Based Portfolio Allocation")
+        st.subheader("Goal-Based Portfolio Planning")
         
-        # Input form for goal parameters
-        col1, col2 = st.columns(2)
+        # Get user's goals for selection
+        user_id = st.session_state[SESSION_KEYS.USER_ID]
+        user_goals = goal_utils.get_user_goals(user_id)
         
-        with col1:
-            goal_timeline = st.slider("Goal Timeline (Years)", min_value=1, max_value=30, value=10)
-        
-        with col2:
-            goal_risk = st.select_slider(
-                "Risk Tolerance",
-                options=["Low", "Medium", "High"],
-                value="Medium"
-            )
-        
-        # Get allocation recommendation based on goal parameters
-        allocation = goal_utils.get_goal_based_allocation(goal_risk, goal_timeline)
-        
-        # Display allocation chart
-        fig = px.pie(
-            names=list(allocation.keys()),
-            values=list(allocation.values()),
-            title=f"Recommended Allocation for {goal_timeline} Year Goal with {goal_risk} Risk",
-            color=list(allocation.keys()),
-            color_discrete_map=get_asset_category_color()
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Display allocation details
-        st.subheader("Allocation Details")
-        
-        # Create a DataFrame for better display
-        allocation_df = pd.DataFrame({
-            "Category": allocation.keys(),
-            "Allocation (%)": allocation.values()
-        })
-        
-        st.dataframe(allocation_df.set_index("Category"), use_container_width=True)
-        
-        # Additional guidance
-        st.subheader("Investment Strategy Guidance")
-        
-        if goal_timeline < 5:
-            st.info("For short-term goals (less than 5 years), focus on capital preservation and liquidity. Consider more conservative investments like fixed income assets and high-quality bonds.")
-        elif goal_timeline < 15:
-            st.info("For medium-term goals (5-15 years), you can afford some market volatility. A balanced portfolio with both growth assets and income-generating investments is recommended.")
+        if not user_goals:
+            st.warning("You don't have any financial goals yet. Create a goal first to use this feature.")
+            if st.button("Create a New Goal"):
+                # Switch to the Create New Goal tab
+                st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 3
+                st.rerun()
         else:
-            st.info("For long-term goals (15+ years), you can take advantage of market growth over time. Focus on growth-oriented investments with potentially higher returns, as you have time to recover from market downturns.")
-        
-        # Expected returns
-        expected_return = goal_utils.get_expected_return_rate(goal_risk)
-        st.markdown(f"**Expected Annual Return Rate:** {expected_return*100:.1f}%")
-        
-        # Example calculation
-        st.subheader("Sample Goal Calculation")
-        
-        example_goal = st.number_input("Example Goal Amount", min_value=1000.0, value=100000.0, step=1000.0)
-        example_current = st.number_input("Current Savings", min_value=0.0, value=0.0, step=1000.0)
-        
-        monthly_investment = goal_utils.calculate_monthly_investment_needed(
-            example_goal, example_current, goal_timeline, expected_return
-        )
-        
-        st.success(f"To reach your ${example_goal:,.2f} goal in {goal_timeline} years, you need to invest approximately **${monthly_investment:,.2f} per month**.")
+            # Goal selection
+            goal_options = {f"{goal.name} (${goal.target_amount:,.0f}, {goal.timeline_years} years)": goal.id for goal in user_goals}
+            selected_goal_label = st.selectbox("Choose a financial goal", list(goal_options.keys()))
+            selected_goal_id = goal_options[selected_goal_label]
+            
+            # Retrieve the selected goal
+            selected_goal = goal_utils.get_goal_by_id(selected_goal_id)
+            
+            if selected_goal:
+                # Display goal details
+                st.write("---")
+                col1, col2, col3 = st.columns([2, 1, 1])
+                
+                with col1:
+                    st.subheader(f"Goal: {selected_goal.name}")
+                    st.markdown(f"**Target amount:** ${selected_goal.target_amount:,.2f}")
+                    st.markdown(f"**Timeline:** {selected_goal.timeline_years} years")
+                
+                with col2:
+                    progress = goal_utils.calculate_goal_progress_percentage(selected_goal.current_amount, selected_goal.target_amount)
+                    st.markdown("**Progress**")
+                    st.progress(progress / 100)
+                    st.markdown(f"${selected_goal.current_amount:,.2f} of ${selected_goal.target_amount:,.2f}")
+                
+                with col3:
+                    st.markdown("**Risk Level**")
+                    st.markdown(f"**{selected_goal.risk_level}**")
+                    
+                    # Option to adjust risk
+                    new_risk = st.selectbox(
+                        "Adjust Risk",
+                        options=["Low", "Medium", "High"],
+                        index=["Low", "Medium", "High"].index(selected_goal.risk_level)
+                    )
+                    
+                    if new_risk != selected_goal.risk_level and st.button("Update Risk"):
+                        # Update the goal's risk level
+                        if goal_utils.update_goal_risk_level(selected_goal.id, new_risk):
+                            st.success(f"Risk level updated to {new_risk}")
+                            st.rerun()  # Refresh to show the updated risk level
+                        else:
+                            st.error("Failed to update risk level")
+                
+                st.write("---")
+                
+                # Calculate remaining time and monthly investment
+                now = datetime.datetime.utcnow()
+                days_remaining = (selected_goal.target_date - now).days
+                years_remaining = max(0, days_remaining / 365)
+                expected_return = goal_utils.get_expected_return_rate(selected_goal.risk_level)
+                
+                monthly_investment = goal_utils.calculate_monthly_investment_needed(
+                    selected_goal.target_amount, 
+                    selected_goal.current_amount, 
+                    years_remaining, 
+                    expected_return
+                )
+                
+                # Display monthly investment needed
+                st.subheader("Investment Plan")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric(
+                        label="Monthly Investment Needed", 
+                        value=f"${monthly_investment:,.2f}"
+                    )
+                    st.markdown(f"**Expected Return:** {expected_return*100:.1f}% annually")
+                    st.markdown(f"**Time Remaining:** {days_remaining} days ({years_remaining:.1f} years)")
+                
+                # Get allocation recommendation based on goal parameters
+                allocation = goal_utils.get_goal_based_allocation(selected_goal.risk_level, years_remaining)
+                
+                with col2:
+                    # Display allocation chart
+                    fig = px.pie(
+                        names=list(allocation.keys()),
+                        values=list(allocation.values()),
+                        title="Recommended Portfolio Allocation",
+                        color=list(allocation.keys()),
+                        color_discrete_map=get_asset_category_color()
+                    )
+                    fig.update_layout(margin=dict(l=0, r=0, t=40, b=0))
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Display detailed allocation strategy
+                st.subheader("Investment Allocation Strategy")
+                
+                # Create columns for each asset category
+                allocation_cols = st.columns(len(allocation))
+                
+                # For each category, show allocation percentage and a brief strategy
+                for i, (category, percentage) in enumerate(allocation.items()):
+                    with allocation_cols[i]:
+                        st.metric(label=category, value=f"{percentage}%")
+                        
+                        # Display strategy based on category and risk
+                        if category == "Large Cap":
+                            st.markdown("Stable, established companies with market capitalization > $10 billion")
+                        elif category == "Mid Cap":
+                            st.markdown("Growing companies with market capitalization $2-10 billion")
+                        elif category == "Small Cap":
+                            st.markdown("Smaller companies with higher growth potential but higher risk")
+                        elif category == "Gold":
+                            st.markdown("Hedge against inflation and market volatility")
+                        elif category == "ETFs/Crypto":
+                            st.markdown("Diversified or specialized funds with targeted exposure")
+                        elif category == "Bonds/Fixed Income":
+                            st.markdown("Debt securities providing fixed interest payments and lower risk")
+                
+                # Investment amount calculator
+                st.subheader("Calculate Your Investment Distribution")
+                
+                custom_amount = st.number_input(
+                    "Monthly Investment Amount", 
+                    min_value=0.0, 
+                    value=monthly_investment, 
+                    step=50.0
+                )
+                
+                if custom_amount > 0:
+                    st.markdown("#### Monthly Investment Distribution")
+                    
+                    # Calculate distribution amounts
+                    distribution = {category: (percentage/100) * custom_amount for category, percentage in allocation.items()}
+                    
+                    # Create a DataFrame to display the distribution
+                    dist_df = pd.DataFrame({
+                        "Category": distribution.keys(),
+                        "Allocation (%)": allocation.values(),
+                        "Monthly Amount ($)": [f"${amount:.2f}" for amount in distribution.values()]
+                    })
+                    
+                    st.dataframe(dist_df.set_index("Category"), use_container_width=True)
+                    
+                    # Option to save this as a portfolio
+                    if st.button("Use This Allocation for My Portfolio"):
+                        try:
+                            # Create a new portfolio with this allocation
+                            portfolio_id = db.create_goal_based_portfolio(
+                                user_id=st.session_state[SESSION_KEYS.USER_ID],
+                                goal_name=selected_goal.name,
+                                allocation=allocation,
+                                market=st.session_state[SESSION_KEYS.MARKET]
+                            )
+                            
+                            if portfolio_id:
+                                # Update session state to show the new portfolio
+                                st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID] = portfolio_id
+                                st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_NAME] = f"Goal Portfolio: {selected_goal.name}"
+                                
+                                # Create portfolio items
+                                portfolio_items = []
+                                for category, percentage in allocation.items():
+                                    # Calculate suggested amount based on percentage
+                                    # Using monthly investment * 12 as a starting point
+                                    suggested_amount = (percentage / 100) * monthly_investment * 12
+                                    
+                                    # Add to portfolio
+                                    portfolio_items.append({
+                                        "name": f"{category} Allocation",
+                                        "category": category,
+                                        "amount": suggested_amount,
+                                        "type": "Stock/ETF"
+                                    })
+                                
+                                # Set in session state
+                                st.session_state[SESSION_KEYS.PORTFOLIO] = portfolio_items
+                                
+                                # Save to database
+                                save_current_portfolio_to_database()
+                                
+                                st.success(f"Portfolio created based on your {selected_goal.name} goal! Now you can select specific investments in each category.")
+                                
+                                # Provide option to go to portfolio management
+                                if st.button("Go to Portfolio Management"):
+                                    st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 4  # Portfolio management screen
+                                    st.rerun()
+                            else:
+                                st.error("Failed to create portfolio")
+                        except Exception as e:
+                            st.error(f"Error creating portfolio: {e}")
+                
+                # Additional guidance
+                st.subheader("Investment Strategy Guidance")
+                
+                if years_remaining < 5:
+                    st.info("For short-term goals (less than 5 years), focus on capital preservation and liquidity. Consider more conservative investments like fixed income assets and high-quality bonds.")
+                elif years_remaining < 15:
+                    st.info("For medium-term goals (5-15 years), you can afford some market volatility. A balanced portfolio with both growth assets and income-generating investments is recommended.")
+                else:
+                    st.info("For long-term goals (15+ years), you can take advantage of market growth over time. Focus on growth-oriented investments with potentially higher returns, as you have time to recover from market downturns.")
 
 def save_current_portfolio_to_database():
     """Save the current portfolio to the database"""

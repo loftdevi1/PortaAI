@@ -247,6 +247,57 @@ def get_latest_recommendation(portfolio_id):
         return None
     finally:
         session.close()
+        
+def create_goal_based_portfolio(user_id, goal_name, allocation, market="INDIA"):
+    """
+    Create a new portfolio based on a financial goal
+    
+    Args:
+        user_id (int): The user ID
+        goal_name (str): Name of the goal to use for portfolio name
+        allocation (dict): Asset allocation dictionary (category -> percentage)
+        market (str): Market region (US or INDIA)
+        
+    Returns:
+        int: New portfolio ID
+    """
+    session = Session()
+    try:
+        # Create the portfolio
+        portfolio_name = f"Goal Portfolio: {goal_name}"
+        portfolio_description = f"Portfolio created for goal: {goal_name}"
+        
+        portfolio = Portfolio(
+            user_id=user_id,
+            name=portfolio_name,
+            description=portfolio_description,
+            market=market
+        )
+        session.add(portfolio)
+        session.flush()  # Get the ID without committing
+        
+        portfolio_id = portfolio.id
+        
+        # Create empty investments based on allocation
+        for category, percentage in allocation.items():
+            # Create a placeholder investment for each category
+            investment = Investment(
+                portfolio_id=portfolio_id,
+                name=f"{category} Allocation",
+                category=category,
+                investment_type="Stock/ETF",  # Default type
+                amount=0  # Start with zero amount
+            )
+            session.add(investment)
+            
+        # Save changes
+        session.commit()
+        return portfolio_id
+    except Exception as e:
+        session.rollback()
+        raise e
+    finally:
+        session.close()
 
 def delete_portfolio(portfolio_id):
     """Mark a portfolio as inactive (soft delete)"""
