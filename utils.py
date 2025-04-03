@@ -6,6 +6,8 @@ class SESSION_KEYS:
     RECOMMENDATIONS = "recommendations"
     SELECTED_CATEGORY = "selected_category"
     SELECTED_STOCKS = "selected_stocks"
+    SELECTED_SIPS = "selected_sips"
+    MARKET = "market"
 
 def initialize_session_state():
     """
@@ -31,6 +33,12 @@ def initialize_session_state():
     
     if SESSION_KEYS.SELECTED_STOCKS not in st.session_state:
         st.session_state[SESSION_KEYS.SELECTED_STOCKS] = {}
+        
+    if SESSION_KEYS.SELECTED_SIPS not in st.session_state:
+        st.session_state[SESSION_KEYS.SELECTED_SIPS] = {}
+        
+    if SESSION_KEYS.MARKET not in st.session_state:
+        st.session_state[SESSION_KEYS.MARKET] = "INDIA"
 
 def get_risk_profile_allocation(risk_profile):
     """
