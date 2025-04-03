@@ -195,11 +195,18 @@ def show_risk_profile_screen():
             """
         }
         
+        # Fix index determination
+        default_index = 0
+        if st.session_state[SESSION_KEYS.RISK_PROFILE] != "":
+            try:
+                default_index = list(risk_profiles.keys()).index(st.session_state[SESSION_KEYS.RISK_PROFILE])
+            except ValueError:
+                default_index = 0
+        
         selected_risk = st.radio(
             "Select your risk tolerance:",
             list(risk_profiles.keys()),
-            index=0 if st.session_state[SESSION_KEYS.RISK_PROFILE] == "" else 
-                  list(risk_profiles.keys()).index(st.session_state[SESSION_KEYS.RISK_PROFILE])
+            index=default_index
         )
         
         st.markdown(risk_profiles[selected_risk])
@@ -217,7 +224,10 @@ def show_risk_profile_screen():
             st.plotly_chart(fig, use_container_width=True)
     
     if st.button("Next", use_container_width=True):
+        # Save the risk profile before changing navigation index
         st.session_state[SESSION_KEYS.RISK_PROFILE] = selected_risk
+        
+        # Set next page to portfolio input
         st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 2
         st.rerun()
 
