@@ -1,6 +1,6 @@
 import datetime
 import os
-from database import Base, Session, engine, User
+from database import Base, Session, engine, User, get_session
 from sqlalchemy import Column, Integer, String, Float, Text, DateTime, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 
@@ -32,7 +32,7 @@ User.goals = relationship("FinancialGoal", back_populates="user", cascade="all, 
 # Database helper functions
 def create_financial_goal(user_id, name, description, target_amount, timeline_years, risk_level):
     """Create a new financial goal"""
-    session = Session()
+    session = get_session()
     try:
         # Calculate target date
         target_date = datetime.datetime.utcnow() + datetime.timedelta(days=365 * timeline_years)
@@ -58,7 +58,7 @@ def create_financial_goal(user_id, name, description, target_amount, timeline_ye
 
 def get_user_goals(user_id):
     """Get all financial goals for a user"""
-    session = Session()
+    session = get_session()
     try:
         goals = session.query(FinancialGoal).filter_by(user_id=user_id, is_active=True).all()
         return goals
@@ -67,7 +67,7 @@ def get_user_goals(user_id):
 
 def get_goal_by_id(goal_id):
     """Get goal by ID"""
-    session = Session()
+    session = get_session()
     try:
         goal = session.query(FinancialGoal).filter_by(id=goal_id).first()
         return goal
@@ -76,7 +76,7 @@ def get_goal_by_id(goal_id):
 
 def update_goal_progress(goal_id, current_amount):
     """Update the current amount for a goal"""
-    session = Session()
+    session = get_session()
     try:
         goal = session.query(FinancialGoal).filter_by(id=goal_id).first()
         if goal:
@@ -92,7 +92,7 @@ def update_goal_progress(goal_id, current_amount):
 
 def delete_goal(goal_id):
     """Mark a goal as inactive (soft delete)"""
-    session = Session()
+    session = get_session()
     try:
         goal = session.query(FinancialGoal).filter_by(id=goal_id).first()
         if goal:
@@ -108,7 +108,7 @@ def delete_goal(goal_id):
 
 def update_goal_risk_level(goal_id, risk_level):
     """Update the risk level for a goal"""
-    session = Session()
+    session = get_session()
     try:
         goal = session.query(FinancialGoal).filter_by(id=goal_id).first()
         if goal:

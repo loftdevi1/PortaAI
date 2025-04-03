@@ -4,11 +4,13 @@ import plotly.express as px
 import plotly.graph_objects as go
 import hashlib
 import datetime
+import os
 from utils import SESSION_KEYS, initialize_session_state, get_risk_profile_allocation, get_asset_category_color
 from portfolio_analyzer import analyze_portfolio, get_allocation_recommendation
 from stock_service import get_stock_suggestions, fetch_stock_data, get_sip_suggestions
 import database as db
 import goals as goal_utils
+from price_alerts import create_price_alert, get_user_price_alerts, delete_price_alert, check_price_alerts, send_sms_price_alerts
 
 def main():
     # Set up page configuration
@@ -42,13 +44,13 @@ def main():
                 navigation = st.radio(
                     "Navigation",
                     ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
-                     "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals"],
+                     "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals", "Price Alerts"],
                     index=st.session_state[SESSION_KEYS.NAVIGATION_INDEX]
                 )
                 
                 # Update navigation state based on selection
                 nav_options = ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
-                              "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals"]
+                              "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals", "Price Alerts"]
                 st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = nav_options.index(navigation)
             else:
                 # Limited navigation if no risk profile yet
@@ -133,6 +135,8 @@ def main():
             show_portfolio_management_screen()
         elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 8:
             show_financial_goals_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 9:
+            show_price_alerts_screen()
 
 def show_welcome_screen():
     st.title("Welcome to PortaAi")
@@ -1349,6 +1353,230 @@ def save_current_portfolio_to_database():
         db.update_user_risk_profile(st.session_state[SESSION_KEYS.USER_ID], st.session_state[SESSION_KEYS.RISK_PROFILE])
     
     return True
+
+def show_price_alerts_screen():
+    """
+    Display the price alerts screen where users can create and manage stock price alerts
+    """
+    st.title("Price Alerts")
+    
+    # Check if user is logged in
+    if not st.session_state[SESSION_KEYS.IS_LOGGED_IN]:
+        st.warning("Please log in to use the price alerts feature.")
+        if st.button("Go to Login"):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 7  # Navigate to login screen
+            st.rerun()
+        return
+    
+    st.markdown("""
+    ### Set up alerts for stock price movements
+    
+    Get notified when stocks reach your target price. You can set alerts for:
+    - When a stock price rises above a certain value
+    - When a stock price falls below a certain value
+    
+    Receive notifications via SMS when your alerts are triggered.
+    """)
+    
+    # Tabs for creating and viewing alerts
+    tab1, tab2 = st.tabs(["Create New Alert", "My Alerts"])
+    
+    with tab1:
+        st.subheader("Create a New Price Alert")
+        
+        # Form for creating a new alert
+        with st.form("create_alert_form"):
+            # Stock ticker input
+            ticker = st.text_input("Stock Ticker Symbol (e.g., AAPL, MSFT)")
+            
+            # Get current price if ticker is provided
+            current_price = None
+            if ticker:
+                try:
+                    price_data = fetch_stock_data([ticker])
+                    if ticker in price_data:
+                        current_price = price_data[ticker]['current_price']
+                        st.info(f"Current price of {ticker}: ${current_price:.2f}")
+                except Exception as e:
+                    st.error(f"Error fetching price for {ticker}: {e}")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Target price input
+                target_price = st.number_input("Target Price ($)", min_value=0.01, step=0.1)
+            
+            with col2:
+                # Alert type selection
+                alert_type = st.radio(
+                    "Alert me when price is:",
+                    ["above", "below"],
+                    horizontal=True
+                )
+            
+            # Phone number for SMS alerts
+            phone_number = st.text_input(
+                "Phone Number for SMS Alerts (with country code, e.g., +1234567890)",
+                placeholder="+1234567890"
+            )
+            
+            # Submit button
+            submitted = st.form_submit_button("Create Alert")
+            
+            # Process form submission
+            if submitted:
+                if not ticker:
+                    st.error("Please enter a stock ticker symbol.")
+                elif target_price <= 0:
+                    st.error("Please enter a valid target price.")
+                elif not phone_number or not phone_number.startswith("+"):
+                    st.error("Please enter a valid phone number with country code starting with '+'.")
+                else:
+                    try:
+                        # Create the alert
+                        alert_id = create_price_alert(
+                            st.session_state[SESSION_KEYS.USER_ID],
+                            ticker.upper(),
+                            target_price,
+                            alert_type,
+                            phone_number=phone_number
+                        )
+                        
+                        if alert_id:
+                            st.success(f"Price alert created for {ticker}! You'll be notified when the price is {alert_type} ${target_price:.2f}.")
+                            st.rerun()
+                        else:
+                            st.error("Failed to create price alert. Please try again.")
+                    except Exception as e:
+                        st.error(f"Error creating alert: {e}")
+    
+    with tab2:
+        st.subheader("Your Price Alerts")
+        
+        # Get user's alerts
+        try:
+            alerts = get_user_price_alerts(st.session_state[SESSION_KEYS.USER_ID])
+            st.session_state[SESSION_KEYS.PRICE_ALERTS] = alerts
+            
+            if not alerts:
+                st.info("You don't have any price alerts yet. Create one in the 'Create New Alert' tab.")
+            else:
+                # Fetch current prices for all tickers
+                tickers = [alert.ticker for alert in alerts]
+                current_prices = fetch_stock_data(tickers)
+                
+                # Display alerts in a table
+                for alert in alerts:
+                    with st.container():
+                        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+                        
+                        with col1:
+                            st.write(f"**{alert.ticker}**")
+                            if alert.is_triggered:
+                                st.write("✅ Triggered")
+                            elif not alert.is_active:
+                                st.write("❌ Inactive")
+                            else:
+                                st.write("🔔 Active")
+                        
+                        with col2:
+                            # Alert details
+                            direction = "above" if alert.alert_type == "above" else "below"
+                            st.write(f"Alert when price goes {direction} ${alert.target_price:.2f}")
+                            
+                            # Show phone number if available
+                            if alert.phone_number:
+                                st.write(f"SMS to: {alert.phone_number}")
+                        
+                        with col3:
+                            # Current price
+                            if alert.ticker in current_prices:
+                                price = current_prices[alert.ticker]['current_price']
+                                st.write(f"Current price: ${price:.2f}")
+                                
+                                # Price difference
+                                diff = price - alert.target_price
+                                diff_percent = (diff / alert.target_price) * 100
+                                
+                                if alert.alert_type == 'above':
+                                    needed_change = alert.target_price - price if price < alert.target_price else 0
+                                    if needed_change > 0:
+                                        st.write(f"Needs to rise: ${needed_change:.2f} ({abs(diff_percent):.1f}%)")
+                                    else:
+                                        st.write(f"Above target: ${abs(diff):.2f} ({abs(diff_percent):.1f}%)")
+                                else:
+                                    needed_change = price - alert.target_price if price > alert.target_price else 0
+                                    if needed_change > 0:
+                                        st.write(f"Needs to fall: ${needed_change:.2f} ({abs(diff_percent):.1f}%)")
+                                    else:
+                                        st.write(f"Below target: ${abs(diff):.2f} ({abs(diff_percent):.1f}%)")
+                            else:
+                                st.write("Unable to fetch current price")
+                        
+                        with col4:
+                            # Delete button
+                            if not alert.is_triggered and alert.is_active:
+                                if st.button("Delete", key=f"delete_{alert.id}"):
+                                    if delete_price_alert(alert.id):
+                                        st.success(f"Alert for {alert.ticker} deleted")
+                                        st.rerun()
+                    
+                    st.divider()
+                
+                # Check alerts button
+                if st.button("Check Alerts Now"):
+                    with st.spinner("Checking your price alerts..."):
+                        # Check if any alerts are triggered
+                        triggered_alerts = check_price_alerts(current_prices)
+                        
+                        if triggered_alerts:
+                            # Try to send SMS notifications
+                            sent_alerts = send_sms_price_alerts(triggered_alerts)
+                            
+                            if sent_alerts:
+                                st.success(f"{len(sent_alerts)} alert(s) triggered and SMS notifications sent!")
+                            else:
+                                st.warning(f"{len(triggered_alerts)} alert(s) triggered but SMS notifications could not be sent. Please check your Twilio settings.")
+                        else:
+                            st.info("No alerts triggered at this time.")
+                        
+                        # Refresh the page to show updated alert statuses
+                        st.rerun()
+        
+        except Exception as e:
+            st.error(f"Error loading alerts: {e}")
+    
+    # Navigation options
+    st.divider()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Back to Portfolio Management", use_container_width=True):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 7
+            st.rerun()
+    
+    with col2:
+        if st.button("View Financial Goals", use_container_width=True):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 8
+            st.rerun()
+    
+    # Check if Twilio credentials are set
+    twilio_ready = all([
+        os.environ.get("TWILIO_ACCOUNT_SID"),
+        os.environ.get("TWILIO_AUTH_TOKEN"),
+        os.environ.get("TWILIO_PHONE_NUMBER")
+    ])
+    
+    if not twilio_ready:
+        st.warning("""
+        **Twilio credentials not found**: To enable SMS notifications, please set the following environment variables:
+        - TWILIO_ACCOUNT_SID
+        - TWILIO_AUTH_TOKEN
+        - TWILIO_PHONE_NUMBER
+        
+        Alerts will still be tracked, but SMS notifications will not be sent until these credentials are provided.
+        """)
 
 if __name__ == "__main__":
     main()

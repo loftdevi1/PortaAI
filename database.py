@@ -10,9 +10,29 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set!")
 
-# Create database engine
-engine = create_engine(DATABASE_URL)
+# Create database engine with connection pooling configuration
+engine = create_engine(
+    DATABASE_URL,
+    pool_size=10,
+    pool_recycle=3600,
+    pool_timeout=30,
+    max_overflow=20,
+    connect_args={'connect_timeout': 30}
+)
 Base = declarative_base()
+
+# Create session factory
+Session = sessionmaker(bind=engine)
+
+# Helper function to create a new session
+def get_session():
+    """Get a new session with error handling and connection retry"""
+    try:
+        session = get_session()
+        return session
+    except Exception as e:
+        print(f"Error creating database session: {e}")
+        raise
 
 # Define database models
 class User(Base):
@@ -91,13 +111,10 @@ class RecommendationHistory(Base):
 # Create all tables
 Base.metadata.create_all(engine)
 
-# Create session factory
-Session = sessionmaker(bind=engine)
-
 # Database helper functions
 def create_user(username, email, password_hash, risk_profile=None):
     """Create a new user"""
-    session = Session()
+    session = get_session()
     try:
         user = User(
             username=username,
@@ -116,7 +133,7 @@ def create_user(username, email, password_hash, risk_profile=None):
 
 def get_user_by_username(username):
     """Get user by username"""
-    session = Session()
+    session = get_session()
     try:
         user = session.query(User).filter_by(username=username).first()
         return user
@@ -125,7 +142,7 @@ def get_user_by_username(username):
 
 def get_user_by_id(user_id):
     """Get user by ID"""
-    session = Session()
+    session = get_session()
     try:
         user = session.query(User).filter_by(id=user_id).first()
         return user
@@ -134,7 +151,7 @@ def get_user_by_id(user_id):
 
 def create_portfolio(user_id, name, description=None, market="INDIA"):
     """Create a new portfolio for a user"""
-    session = Session()
+    session = get_session()
     try:
         portfolio = Portfolio(
             user_id=user_id,
@@ -153,7 +170,7 @@ def create_portfolio(user_id, name, description=None, market="INDIA"):
 
 def get_user_portfolios(user_id):
     """Get all portfolios for a user"""
-    session = Session()
+    session = get_session()
     try:
         portfolios = session.query(Portfolio).filter_by(user_id=user_id, is_active=True).all()
         return portfolios
@@ -162,7 +179,7 @@ def get_user_portfolios(user_id):
 
 def get_portfolio_by_id(portfolio_id):
     """Get portfolio by ID"""
-    session = Session()
+    session = get_session()
     try:
         portfolio = session.query(Portfolio).filter_by(id=portfolio_id).first()
         return portfolio
@@ -172,7 +189,7 @@ def get_portfolio_by_id(portfolio_id):
 def add_investment(portfolio_id, name, category, amount, investment_type, ticker=None, 
                  monthly_amount=None, months_invested=None):
     """Add investment to a portfolio"""
-    session = Session()
+    session = get_session()
     try:
         investment = Investment(
             portfolio_id=portfolio_id,
@@ -195,7 +212,7 @@ def add_investment(portfolio_id, name, category, amount, investment_type, ticker
 
 def get_portfolio_investments(portfolio_id):
     """Get all investments in a portfolio"""
-    session = Session()
+    session = get_session()
     try:
         investments = session.query(Investment).filter_by(portfolio_id=portfolio_id).all()
         return investments
@@ -204,7 +221,7 @@ def get_portfolio_investments(portfolio_id):
 
 def save_recommendation(portfolio_id, current_allocation, target_allocation, actions):
     """Save recommendation history for a portfolio"""
-    session = Session()
+    session = get_session()
     try:
         # Convert dictionaries to JSON strings
         current_allocation_json = json.dumps(current_allocation)
@@ -228,7 +245,7 @@ def save_recommendation(portfolio_id, current_allocation, target_allocation, act
 
 def get_latest_recommendation(portfolio_id):
     """Get the latest recommendation for a portfolio"""
-    session = Session()
+    session = get_session()
     try:
         recommendation = session.query(RecommendationHistory)\
             .filter_by(portfolio_id=portfolio_id)\
@@ -261,7 +278,7 @@ def create_goal_based_portfolio(user_id, goal_name, allocation, market="INDIA"):
     Returns:
         int: New portfolio ID
     """
-    session = Session()
+    session = get_session()
     try:
         # Create the portfolio
         portfolio_name = f"Goal Portfolio: {goal_name}"
@@ -301,7 +318,7 @@ def create_goal_based_portfolio(user_id, goal_name, allocation, market="INDIA"):
 
 def delete_portfolio(portfolio_id):
     """Mark a portfolio as inactive (soft delete)"""
-    session = Session()
+    session = get_session()
     try:
         portfolio = session.query(Portfolio).filter_by(id=portfolio_id).first()
         if portfolio:
@@ -317,7 +334,7 @@ def delete_portfolio(portfolio_id):
 
 def delete_investment(investment_id):
     """Delete an investment from a portfolio"""
-    session = Session()
+    session = get_session()
     try:
         investment = session.query(Investment).filter_by(id=investment_id).first()
         if investment:
@@ -333,7 +350,7 @@ def delete_investment(investment_id):
 
 def update_user_risk_profile(user_id, risk_profile):
     """Update a user's risk profile"""
-    session = Session()
+    session = get_session()
     try:
         user = session.query(User).filter_by(id=user_id).first()
         if user:

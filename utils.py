@@ -14,6 +14,10 @@ class SESSION_KEYS:
     CURRENT_GOAL_ID = "current_goal_id"
     CURRENT_GOAL_NAME = "current_goal_name"
     
+    # Price alerts related keys
+    PRICE_ALERTS = "price_alerts"
+    CURRENT_ALERT_ID = "current_alert_id"
+    
     # Database related keys
     USER_ID = "user_id"
     USER_NAME = "user_name"
@@ -87,6 +91,13 @@ def initialize_session_state():
         
     if SESSION_KEYS.CURRENT_GOAL_NAME not in st.session_state:
         st.session_state[SESSION_KEYS.CURRENT_GOAL_NAME] = None
+        
+    # Price alerts state
+    if SESSION_KEYS.PRICE_ALERTS not in st.session_state:
+        st.session_state[SESSION_KEYS.PRICE_ALERTS] = []
+        
+    if SESSION_KEYS.CURRENT_ALERT_ID not in st.session_state:
+        st.session_state[SESSION_KEYS.CURRENT_ALERT_ID] = None
 
 def get_risk_profile_allocation(risk_profile):
     """
