@@ -2,9 +2,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import hashlib
 from utils import SESSION_KEYS, initialize_session_state, get_risk_profile_allocation, get_asset_category_color
 from portfolio_analyzer import analyze_portfolio, get_allocation_recommendation
 from stock_service import get_stock_suggestions, fetch_stock_data, get_sip_suggestions
+import database as db
 
 def main():
     # Set up page configuration
@@ -30,41 +32,103 @@ def main():
         )
         st.session_state[SESSION_KEYS.MARKET] = market
         
-        # Only show navigation options once risk is selected
-        if st.session_state[SESSION_KEYS.RISK_PROFILE]:
-            navigation = st.radio(
-                "Navigation",
-                ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
-                 "Recommendations", "Stock Selection", "Summary"],
-                index=st.session_state[SESSION_KEYS.NAVIGATION_INDEX]
-            )
+        # Show navigation options based on authentication and profile status
+        if st.session_state[SESSION_KEYS.IS_LOGGED_IN]:
+            # Navigation for logged-in users
+            if st.session_state[SESSION_KEYS.RISK_PROFILE]:
+                # Full navigation if risk profile is set
+                navigation = st.radio(
+                    "Navigation",
+                    ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
+                     "Recommendations", "Stock Selection", "Summary", "Portfolio Management"],
+                    index=st.session_state[SESSION_KEYS.NAVIGATION_INDEX]
+                )
+                
+                # Update navigation state based on selection
+                nav_options = ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
+                              "Recommendations", "Stock Selection", "Summary", "Portfolio Management"]
+                st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = nav_options.index(navigation)
+            else:
+                # Limited navigation if no risk profile yet
+                navigation = st.radio(
+                    "Navigation",
+                    ["Welcome", "Risk Profile", "Portfolio Management"],
+                    index=st.session_state[SESSION_KEYS.NAVIGATION_INDEX]
+                )
+                
+                # Make sure the index matches the selection
+                if navigation == "Welcome":
+                    st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 0
+                elif navigation == "Risk Profile":
+                    st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 1
+                elif navigation == "Portfolio Management":
+                    st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 7
             
-            # Update navigation state based on selection
-            nav_options = ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
-                          "Recommendations", "Stock Selection", "Summary"]
-            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = nav_options.index(navigation)
+            # Logout option for logged-in users
+            if st.button("Logout"):
+                # Reset user session state
+                st.session_state[SESSION_KEYS.IS_LOGGED_IN] = False
+                st.session_state[SESSION_KEYS.USER_ID] = None
+                st.session_state[SESSION_KEYS.USER_NAME] = None
+                st.session_state[SESSION_KEYS.USER_EMAIL] = None
+                st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID] = None
+                st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_NAME] = None
+                st.session_state[SESSION_KEYS.USER_PORTFOLIOS] = []
+                st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 0
+                st.rerun()
         else:
-            navigation = st.radio(
-                "Navigation",
-                ["Welcome", "Risk Profile"],
-                index=st.session_state[SESSION_KEYS.NAVIGATION_INDEX]
-            )
+            # Navigation for non-logged in users
+            if st.session_state[SESSION_KEYS.RISK_PROFILE]:
+                navigation = st.radio(
+                    "Navigation",
+                    ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
+                     "Recommendations", "Stock Selection", "Summary"],
+                    index=st.session_state[SESSION_KEYS.NAVIGATION_INDEX]
+                )
+                
+                # Update navigation state based on selection
+                nav_options = ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
+                              "Recommendations", "Stock Selection", "Summary"]
+                st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = nav_options.index(navigation)
+            else:
+                navigation = st.radio(
+                    "Navigation",
+                    ["Welcome", "Risk Profile"],
+                    index=st.session_state[SESSION_KEYS.NAVIGATION_INDEX]
+                )
     
-    # Display the appropriate screen based on navigation
-    if st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 0:
-        show_welcome_screen()
-    elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 1:
-        show_risk_profile_screen()
-    elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 2:
-        show_portfolio_input_screen()
-    elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 3:
-        show_portfolio_analysis_screen()
-    elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 4:
-        show_recommendations_screen()
-    elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 5:
-        show_stock_selection_screen()
-    elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 6:
-        show_summary_screen()
+    # Display login/register screens if not logged in
+    if not st.session_state[SESSION_KEYS.IS_LOGGED_IN]:
+        # Navigation between login and register for non-logged in users
+        auth_nav = st.sidebar.radio(
+            "Authentication",
+            ["Login", "Register"],
+            index=0
+        )
+        
+        if auth_nav == "Login":
+            show_login_screen()
+        else:
+            show_register_screen()
+    else:
+        # For logged in users, show regular navigation
+        # Display the appropriate screen based on navigation
+        if st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 0:
+            show_welcome_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 1:
+            show_risk_profile_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 2:
+            show_portfolio_input_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 3:
+            show_portfolio_analysis_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 4:
+            show_recommendations_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 5:
+            show_stock_selection_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 6:
+            show_summary_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 7:
+            show_portfolio_management_screen()
 
 def show_welcome_screen():
     st.title("Welcome to PortaAi")
@@ -249,7 +313,7 @@ def show_portfolio_input_screen():
                 })
                 st.rerun()
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         if st.button("Clear Portfolio", use_container_width=True):
@@ -257,6 +321,14 @@ def show_portfolio_input_screen():
             st.rerun()
     
     with col2:
+        # Only show save button if user is logged in and has a current portfolio
+        if st.session_state[SESSION_KEYS.IS_LOGGED_IN] and st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID]:
+            if st.button("Save Portfolio", use_container_width=True, disabled=len(st.session_state[SESSION_KEYS.PORTFOLIO]) == 0):
+                if save_current_portfolio_to_database():
+                    st.success("Portfolio saved successfully!")
+                    st.rerun()
+    
+    with col3:
         # Only allow proceeding if portfolio has items
         if st.button("Analyze Portfolio", use_container_width=True, disabled=len(st.session_state[SESSION_KEYS.PORTFOLIO]) == 0):
             st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 3
@@ -646,6 +718,307 @@ def show_summary_screen():
         st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 0
         
         st.rerun()
+
+def show_login_screen():
+    st.title("Login to PortaAi")
+    
+    st.markdown("""
+    ### Welcome back to PortaAi
+    
+    Login to access your saved portfolios and continue your investment journey.
+    """)
+    
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        
+        submitted = st.form_submit_button("Login")
+        
+        if submitted and username and password:
+            # Hash the password for comparison
+            hashed_password = hashlib.sha256(password.encode()).hexdigest()
+            
+            # Try to find the user
+            user = db.get_user_by_username(username)
+            
+            if user and user.password_hash == hashed_password:
+                # Login successful
+                st.session_state[SESSION_KEYS.IS_LOGGED_IN] = True
+                st.session_state[SESSION_KEYS.USER_ID] = user.id
+                st.session_state[SESSION_KEYS.USER_NAME] = user.username
+                st.session_state[SESSION_KEYS.USER_EMAIL] = user.email
+                
+                # Get user risk profile if already set
+                if user.risk_profile:
+                    st.session_state[SESSION_KEYS.RISK_PROFILE] = user.risk_profile
+                
+                # Load user portfolios
+                portfolios = db.get_user_portfolios(user.id)
+                st.session_state[SESSION_KEYS.USER_PORTFOLIOS] = portfolios
+                
+                st.success("Login successful!")
+                st.rerun()
+            else:
+                st.error("Invalid username or password")
+    
+    st.markdown("---")
+    st.markdown("Don't have an account? Use the sidebar to register.")
+
+def show_register_screen():
+    st.title("Create an Account")
+    
+    st.markdown("""
+    ### Join PortaAi
+    
+    Create an account to save your portfolios and track your investments.
+    """)
+    
+    with st.form("register_form"):
+        username = st.text_input("Username")
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        confirm_password = st.text_input("Confirm Password", type="password")
+        
+        submitted = st.form_submit_button("Register")
+        
+        if submitted:
+            # Validate the form
+            if not username or not email or not password:
+                st.error("All fields are required")
+            elif password != confirm_password:
+                st.error("Passwords do not match")
+            else:
+                # Check if username already exists
+                existing_user = db.get_user_by_username(username)
+                
+                if existing_user:
+                    st.error("Username already exists")
+                else:
+                    # Hash the password for storage
+                    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+                    
+                    try:
+                        # Create the user
+                        user_id = db.create_user(username, email, hashed_password)
+                        
+                        # Login the user
+                        st.session_state[SESSION_KEYS.IS_LOGGED_IN] = True
+                        st.session_state[SESSION_KEYS.USER_ID] = user_id
+                        st.session_state[SESSION_KEYS.USER_NAME] = username
+                        st.session_state[SESSION_KEYS.USER_EMAIL] = email
+                        
+                        st.success("Account created successfully!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error creating account: {str(e)}")
+    
+    st.markdown("---")
+    st.markdown("Already have an account? Use the sidebar to login.")
+
+def show_portfolio_management_screen():
+    st.title("Portfolio Management")
+    
+    if not st.session_state[SESSION_KEYS.IS_LOGGED_IN]:
+        st.warning("Please login to manage your portfolios")
+        return
+    
+    st.markdown(f"### Welcome, {st.session_state[SESSION_KEYS.USER_NAME]}")
+    
+    # Create tabs for different portfolio management functions
+    tab1, tab2 = st.tabs(["My Portfolios", "Create New Portfolio"])
+    
+    with tab1:
+        st.subheader("Your Saved Portfolios")
+        
+        # Refresh portfolios list
+        portfolios = db.get_user_portfolios(st.session_state[SESSION_KEYS.USER_ID])
+        st.session_state[SESSION_KEYS.USER_PORTFOLIOS] = portfolios
+        
+        if not portfolios:
+            st.info("You don't have any saved portfolios yet. Create a new one to get started.")
+        else:
+            # Display portfolios in a table
+            portfolio_data = []
+            
+            for portfolio in portfolios:
+                # Get investments for this portfolio
+                investments = db.get_portfolio_investments(portfolio.id)
+                total_value = sum(investment.amount for investment in investments)
+                
+                portfolio_data.append({
+                    "ID": portfolio.id,
+                    "Name": portfolio.name,
+                    "Description": portfolio.description or "-",
+                    "Market": portfolio.market,
+                    "Investments": len(investments),
+                    "Total Value": f"${total_value:,.2f}",
+                    "Created": portfolio.created_at.strftime("%Y-%m-%d")
+                })
+            
+            df = pd.DataFrame(portfolio_data)
+            st.dataframe(df, use_container_width=True)
+            
+            # Portfolio selection
+            selected_portfolio_id = st.selectbox(
+                "Select a portfolio to load",
+                options=[p.id for p in portfolios],
+                format_func=lambda x: next((p.name for p in portfolios if p.id == x), "")
+            )
+            
+            if selected_portfolio_id:
+                if st.button("Load Selected Portfolio"):
+                    # Load the selected portfolio
+                    load_portfolio_from_database(selected_portfolio_id)
+                    st.success("Portfolio loaded successfully!")
+                    st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 2  # Go to portfolio input screen
+                    st.rerun()
+                
+                if st.button("Delete Selected Portfolio", type="secondary"):
+                    # Delete confirmation
+                    if st.checkbox("I understand this action cannot be undone"):
+                        if db.delete_portfolio(selected_portfolio_id):
+                            st.success("Portfolio deleted successfully!")
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete portfolio")
+    
+    with tab2:
+        st.subheader("Create a New Portfolio")
+        
+        with st.form("create_portfolio_form"):
+            portfolio_name = st.text_input("Portfolio Name")
+            portfolio_description = st.text_area("Description (optional)")
+            portfolio_market = st.radio("Market", ["INDIA", "US"])
+            
+            submitted = st.form_submit_button("Create Portfolio")
+            
+            if submitted and portfolio_name:
+                try:
+                    # Create the portfolio
+                    portfolio_id = db.create_portfolio(
+                        st.session_state[SESSION_KEYS.USER_ID],
+                        portfolio_name,
+                        portfolio_description,
+                        portfolio_market
+                    )
+                    
+                    # Set as current portfolio
+                    st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID] = portfolio_id
+                    st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_NAME] = portfolio_name
+                    st.session_state[SESSION_KEYS.MARKET] = portfolio_market
+                    
+                    # Clear current portfolio data
+                    st.session_state[SESSION_KEYS.PORTFOLIO] = []
+                    
+                    st.success("Portfolio created successfully!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error creating portfolio: {str(e)}")
+
+def load_portfolio_from_database(portfolio_id):
+    """Load a portfolio from the database into the session state"""
+    portfolio = db.get_portfolio_by_id(portfolio_id)
+    
+    if not portfolio:
+        st.error("Portfolio not found")
+        return False
+    
+    # Set portfolio info in session
+    st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID] = portfolio.id
+    st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_NAME] = portfolio.name
+    st.session_state[SESSION_KEYS.MARKET] = portfolio.market
+    
+    # Get investments
+    investments = db.get_portfolio_investments(portfolio.id)
+    
+    # Clear current portfolio and load from database
+    portfolio_items = []
+    
+    for inv in investments:
+        item = {
+            "name": inv.name,
+            "category": inv.category,
+            "amount": inv.amount,
+            "type": inv.investment_type
+        }
+        
+        # Add SIP-specific fields if applicable
+        if inv.investment_type == "SIP" and inv.monthly_amount and inv.months_invested:
+            item["monthly_amount"] = inv.monthly_amount
+            item["months_invested"] = inv.months_invested
+        
+        # Add ticker if available
+        if inv.ticker:
+            item["ticker"] = inv.ticker
+            
+        portfolio_items.append(item)
+    
+    st.session_state[SESSION_KEYS.PORTFOLIO] = portfolio_items
+    
+    # Get user risk profile if not already set
+    if not st.session_state[SESSION_KEYS.RISK_PROFILE]:
+        user = db.get_user_by_id(st.session_state[SESSION_KEYS.USER_ID])
+        if user and user.risk_profile:
+            st.session_state[SESSION_KEYS.RISK_PROFILE] = user.risk_profile
+    
+    return True
+
+def save_current_portfolio_to_database():
+    """Save the current portfolio to the database"""
+    if not st.session_state[SESSION_KEYS.IS_LOGGED_IN]:
+        st.warning("Please login to save your portfolio")
+        return False
+    
+    if not st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID]:
+        st.error("No current portfolio selected. Please create a new portfolio first.")
+        return False
+    
+    portfolio_id = st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID]
+    
+    # First, delete existing investments for this portfolio
+    # (This is a simple approach; in a production app you might want to update existing investments)
+    investments = db.get_portfolio_investments(portfolio_id)
+    for inv in investments:
+        db.delete_investment(inv.id)
+    
+    # Now add all current investments
+    for item in st.session_state[SESSION_KEYS.PORTFOLIO]:
+        # Extract required fields
+        name = item["name"]
+        category = item["category"]
+        amount = item["amount"]
+        investment_type = item["type"]
+        
+        # Optional fields
+        ticker = item.get("ticker")
+        monthly_amount = item.get("monthly_amount")
+        months_invested = item.get("months_invested")
+        
+        # Add to database
+        db.add_investment(
+            portfolio_id,
+            name,
+            category,
+            amount,
+            investment_type,
+            ticker,
+            monthly_amount,
+            months_invested
+        )
+    
+    # Save recommendation if available
+    if st.session_state[SESSION_KEYS.ANALYSIS_RESULT] and st.session_state[SESSION_KEYS.RECOMMENDATIONS]:
+        current_allocation = st.session_state[SESSION_KEYS.ANALYSIS_RESULT]["current_allocation"]
+        target_allocation = st.session_state[SESSION_KEYS.ANALYSIS_RESULT]["target_allocation"]
+        actions = st.session_state[SESSION_KEYS.RECOMMENDATIONS]["actions"]
+        
+        db.save_recommendation(portfolio_id, current_allocation, target_allocation, actions)
+    
+    # Update user risk profile if set
+    if st.session_state[SESSION_KEYS.RISK_PROFILE]:
+        db.update_user_risk_profile(st.session_state[SESSION_KEYS.USER_ID], st.session_state[SESSION_KEYS.RISK_PROFILE])
+    
+    return True
 
 if __name__ == "__main__":
     main()

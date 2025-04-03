@@ -8,11 +8,21 @@ class SESSION_KEYS:
     SELECTED_STOCKS = "selected_stocks"
     SELECTED_SIPS = "selected_sips"
     MARKET = "market"
+    
+    # Database related keys
+    USER_ID = "user_id"
+    USER_NAME = "user_name"
+    USER_EMAIL = "user_email"
+    IS_LOGGED_IN = "is_logged_in"
+    CURRENT_PORTFOLIO_ID = "current_portfolio_id"
+    CURRENT_PORTFOLIO_NAME = "current_portfolio_name"
+    USER_PORTFOLIOS = "user_portfolios"
 
 def initialize_session_state():
     """
     Initialize session state variables if they don't exist.
     """
+    # Navigation and UI state
     if SESSION_KEYS.NAVIGATION_INDEX not in st.session_state:
         st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 0
     
@@ -39,6 +49,29 @@ def initialize_session_state():
         
     if SESSION_KEYS.MARKET not in st.session_state:
         st.session_state[SESSION_KEYS.MARKET] = "INDIA"
+    
+    # User and authentication state
+    if SESSION_KEYS.USER_ID not in st.session_state:
+        st.session_state[SESSION_KEYS.USER_ID] = None
+        
+    if SESSION_KEYS.USER_NAME not in st.session_state:
+        st.session_state[SESSION_KEYS.USER_NAME] = None
+        
+    if SESSION_KEYS.USER_EMAIL not in st.session_state:
+        st.session_state[SESSION_KEYS.USER_EMAIL] = None
+        
+    if SESSION_KEYS.IS_LOGGED_IN not in st.session_state:
+        st.session_state[SESSION_KEYS.IS_LOGGED_IN] = False
+        
+    # Portfolio database state
+    if SESSION_KEYS.CURRENT_PORTFOLIO_ID not in st.session_state:
+        st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID] = None
+        
+    if SESSION_KEYS.CURRENT_PORTFOLIO_NAME not in st.session_state:
+        st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_NAME] = None
+        
+    if SESSION_KEYS.USER_PORTFOLIOS not in st.session_state:
+        st.session_state[SESSION_KEYS.USER_PORTFOLIOS] = []
 
 def get_risk_profile_allocation(risk_profile):
     """
