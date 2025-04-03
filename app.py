@@ -11,6 +11,11 @@ from stock_service import get_stock_suggestions, fetch_stock_data, get_sip_sugge
 import database as db
 import goals as goal_utils
 from price_alerts import create_price_alert, get_user_price_alerts, delete_price_alert, check_price_alerts, send_sms_price_alerts
+from ai_recommendations import (
+    generate_investment_recommendations,
+    generate_tax_optimization_advice,
+    analyze_portfolio_strengths_weaknesses
+)
 
 def main():
     # Set up page configuration
@@ -44,13 +49,15 @@ def main():
                 navigation = st.radio(
                     "Navigation",
                     ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
-                     "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals", "Price Alerts"],
+                     "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals", "Price Alerts",
+                     "AI Recommendations", "Tax Optimization"],
                     index=st.session_state[SESSION_KEYS.NAVIGATION_INDEX]
                 )
                 
                 # Update navigation state based on selection
                 nav_options = ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
-                              "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals", "Price Alerts"]
+                              "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals", "Price Alerts",
+                              "AI Recommendations", "Tax Optimization"]
                 st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = nav_options.index(navigation)
             else:
                 # Limited navigation if no risk profile yet
@@ -137,6 +144,10 @@ def main():
             show_financial_goals_screen()
         elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 9:
             show_price_alerts_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 10:
+            show_ai_recommendations_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 11:
+            show_tax_optimization_screen()
 
 def show_welcome_screen():
     st.title("Welcome to PortaAi")
@@ -152,6 +163,9 @@ def show_welcome_screen():
     - Recommendations for balanced distribution
     - Personalized stock and SIP suggestions
     - Support for both Indian and US markets
+    - AI-powered investment recommendations
+    - Tax optimization strategies
+    - Mobile-responsive interface
     """)
     
     # Create columns for better layout
@@ -872,7 +886,7 @@ def show_portfolio_management_screen():
     st.markdown(f"### Welcome, {st.session_state[SESSION_KEYS.USER_NAME]}")
     
     # Create tabs for different portfolio management functions
-    tab1, tab2 = st.tabs(["My Portfolios", "Create New Portfolio"])
+    tab1, tab2, tab3 = st.tabs(["My Portfolios", "Create New Portfolio", "Advanced Features"])
     
     with tab1:
         st.subheader("Your Saved Portfolios")
@@ -961,6 +975,54 @@ def show_portfolio_management_screen():
                     st.rerun()
                 except Exception as e:
                     st.error(f"Error creating portfolio: {str(e)}")
+    
+    with tab3:
+        st.subheader("Advanced Portfolio Features")
+        
+        st.markdown("""
+        Take your portfolio management to the next level with our advanced AI-powered tools.
+        These features provide personalized recommendations and optimization strategies.
+        """)
+        
+        # Create two columns for AI recommendations and Tax optimization
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            with st.expander("AI Investment Recommendations", expanded=True):
+                st.markdown("""
+                **Get AI-Powered Investment Recommendations**
+                
+                Our advanced AI system will analyze your current portfolio, risk profile, 
+                and financial goals to provide tailored investment advice.
+                
+                Features:
+                - Personalized investment suggestions
+                - Portfolio strengths and weaknesses analysis
+                - Long-term strategy recommendations
+                - Risk assessment
+                """)
+                
+                if st.button("View AI Recommendations", key="ai_rec_button"):
+                    st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 10
+                    st.rerun()
+        
+        with col2:
+            with st.expander("Tax Optimization", expanded=True):
+                st.markdown("""
+                **Optimize Your Portfolio for Tax Efficiency**
+                
+                Get AI-generated tax optimization strategies tailored to your investment portfolio.
+                
+                Features:
+                - Tax-loss harvesting opportunities
+                - Tax-advantaged account recommendations
+                - Capital gains strategies
+                - Tax-efficient investment alternatives
+                """)
+                
+                if st.button("View Tax Strategies", key="tax_opt_button"):
+                    st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 11
+                    st.rerun()
 
 def load_portfolio_from_database(portfolio_id):
     """Load a portfolio from the database into the session state"""
@@ -1616,6 +1678,257 @@ def show_price_alerts_screen():
         
         Alerts will still be tracked, but SMS notifications will not be sent until these credentials are provided.
         """)
+
+def show_ai_recommendations_screen():
+    st.title("AI-Powered Investment Recommendations")
+    
+    # Make sure we have portfolio data
+    if not st.session_state[SESSION_KEYS.PORTFOLIO]:
+        st.warning("No portfolio data available. Please go back and add your investments.")
+        if st.button("Back to Portfolio Input"):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 2
+            st.rerun()
+        return
+    
+    st.markdown("""
+    ### Get personalized AI-powered recommendations for your portfolio
+    
+    Our advanced AI system will analyze your current portfolio, risk profile, 
+    and financial goals to provide tailored investment advice.
+    """)
+    
+    # Two columns for options
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Investment Recommendations")
+        st.write("Get AI-powered investment suggestions based on your current portfolio and risk profile.")
+        
+        if st.button("Generate Investment Recommendations", use_container_width=True):
+            with st.spinner("Analyzing your portfolio and generating recommendations..."):
+                # Get financial goals if available
+                financial_goals = st.session_state.get(SESSION_KEYS.FINANCIAL_GOALS, [])
+                
+                # Generate AI recommendations
+                recommendations = generate_investment_recommendations(
+                    st.session_state[SESSION_KEYS.PORTFOLIO],
+                    st.session_state[SESSION_KEYS.RISK_PROFILE],
+                    st.session_state[SESSION_KEYS.MARKET],
+                    financial_goals
+                )
+                
+                # Store in session state
+                st.session_state[SESSION_KEYS.AI_RECOMMENDATIONS] = recommendations
+                st.rerun()
+    
+    with col2:
+        st.subheader("Portfolio SWOT Analysis")
+        st.write("Get a detailed SWOT (Strengths, Weaknesses, Opportunities, Threats) analysis of your portfolio.")
+        
+        if st.button("Generate SWOT Analysis", use_container_width=True):
+            with st.spinner("Performing SWOT analysis of your portfolio..."):
+                # Generate SWOT analysis
+                swot = analyze_portfolio_strengths_weaknesses(
+                    st.session_state[SESSION_KEYS.PORTFOLIO],
+                    st.session_state[SESSION_KEYS.RISK_PROFILE]
+                )
+                
+                # Store in session state
+                st.session_state[SESSION_KEYS.PORTFOLIO_SWOT] = swot
+                st.rerun()
+    
+    # Display AI recommendations if available
+    if st.session_state[SESSION_KEYS.AI_RECOMMENDATIONS]:
+        st.header("AI Investment Recommendations")
+        
+        recommendations = st.session_state[SESSION_KEYS.AI_RECOMMENDATIONS]
+        
+        # Portfolio assessment
+        st.subheader("Portfolio Assessment")
+        st.markdown(recommendations.get("assessment", "No assessment available."))
+        
+        # Specific recommendations
+        st.subheader("Specific Investment Recommendations")
+        specific_recs = recommendations.get("specific_recommendations", [])
+        
+        if specific_recs:
+            for i, rec in enumerate(specific_recs):
+                with st.expander(f"Recommendation {i+1}", expanded=True):
+                    st.markdown(rec)
+        else:
+            st.info("No specific investment recommendations available.")
+        
+        # Long-term strategy
+        st.subheader("Long-Term Strategy")
+        st.markdown(recommendations.get("long_term_strategy", "No long-term strategy available."))
+        
+        # Risk warning
+        st.subheader("Risk Warning")
+        st.warning(recommendations.get("risk_warning", "No risk warning available."))
+    
+    # Display SWOT analysis if available
+    if st.session_state[SESSION_KEYS.PORTFOLIO_SWOT]:
+        st.header("Portfolio SWOT Analysis")
+        
+        swot = st.session_state[SESSION_KEYS.PORTFOLIO_SWOT]
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Strengths
+            st.subheader("Strengths")
+            strengths = swot.get("strengths", ["No strengths identified."])
+            for strength in strengths:
+                st.success(strength)
+            
+            # Weaknesses
+            st.subheader("Weaknesses")
+            weaknesses = swot.get("weaknesses", ["No weaknesses identified."])
+            for weakness in weaknesses:
+                st.warning(weakness)
+        
+        with col2:
+            # Opportunities
+            st.subheader("Opportunities")
+            opportunities = swot.get("opportunities", ["No opportunities identified."])
+            for opportunity in opportunities:
+                st.info(opportunity)
+            
+            # Threats
+            st.subheader("Threats")
+            threats = swot.get("threats", ["No threats identified."])
+            for threat in threats:
+                st.error(threat)
+    
+    # Navigation buttons at the bottom
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("Back to Analysis", use_container_width=True):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 3
+            st.rerun()
+    
+    with col3:
+        if st.button("View Tax Optimization", use_container_width=True):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 11
+            st.rerun()
+
+def show_tax_optimization_screen():
+    st.title("Tax Optimization")
+    
+    # Make sure we have portfolio data
+    if not st.session_state[SESSION_KEYS.PORTFOLIO]:
+        st.warning("No portfolio data available. Please go back and add your investments.")
+        if st.button("Back to Portfolio Input"):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 2
+            st.rerun()
+        return
+    
+    st.markdown("""
+    ### Optimize your investment strategy for tax efficiency
+    
+    Get personalized tax optimization advice based on your portfolio and market region.
+    """)
+    
+    # Market selection for tax rules
+    country = st.radio(
+        "Select your tax jurisdiction:",
+        ["US", "INDIA"],
+        index=0 if st.session_state[SESSION_KEYS.MARKET] == "US" else 1,
+        horizontal=True
+    )
+    
+    if st.button("Generate Tax Optimization Advice", use_container_width=True):
+        with st.spinner("Analyzing your portfolio for tax efficiency..."):
+            # Generate tax optimization advice
+            tax_advice = generate_tax_optimization_advice(
+                st.session_state[SESSION_KEYS.PORTFOLIO],
+                country
+            )
+            
+            # Store in session state
+            st.session_state[SESSION_KEYS.TAX_OPTIMIZATION] = tax_advice
+            st.rerun()
+    
+    # Display tax optimization advice if available
+    if st.session_state[SESSION_KEYS.TAX_OPTIMIZATION]:
+        st.header("Tax Optimization Recommendations")
+        
+        tax_advice = st.session_state[SESSION_KEYS.TAX_OPTIMIZATION]
+        
+        # Create tabs for different tax optimization strategies
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "Tax-Loss Harvesting", 
+            "Tax-Advantaged Accounts", 
+            "Capital Gains Strategy", 
+            "Tax-Efficient Alternatives"
+        ])
+        
+        with tab1:
+            st.subheader("Tax-Loss Harvesting Opportunities")
+            st.markdown(tax_advice.get("tax_loss_harvesting", "No tax-loss harvesting advice available."))
+        
+        with tab2:
+            st.subheader("Tax-Advantaged Account Recommendations")
+            st.markdown(tax_advice.get("tax_advantaged_accounts", "No tax-advantaged account recommendations available."))
+        
+        with tab3:
+            st.subheader("Capital Gains Strategy")
+            st.markdown(tax_advice.get("capital_gains_strategy", "No capital gains strategy available."))
+        
+        with tab4:
+            st.subheader("Tax-Efficient Investment Alternatives")
+            alternatives = tax_advice.get("tax_efficient_alternatives", [])
+            
+            if isinstance(alternatives, list) and alternatives:
+                for alt in alternatives:
+                    st.markdown(f"- {alt}")
+            elif isinstance(alternatives, str):
+                st.markdown(alternatives)
+            else:
+                st.info("No tax-efficient alternatives available.")
+    
+    # Add mobile-friendly responsive design enhancements
+    st.markdown("""
+    <style>
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+            padding-top: 1rem;
+        }
+        h1 {
+            font-size: 1.8rem !important;
+        }
+        h2 {
+            font-size: 1.5rem !important;
+        }
+        h3 {
+            font-size: 1.2rem !important;
+        }
+        .stButton button {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+        .markdown-text-container {
+            font-size: 0.9rem;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Navigation buttons at the bottom
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if st.button("Back to AI Recommendations", use_container_width=True):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 10
+            st.rerun()
+    
+    with col3:
+        if st.button("Back to Portfolio Management", use_container_width=True):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 7
+            st.rerun()
 
 if __name__ == "__main__":
     main()

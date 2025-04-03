@@ -18,6 +18,13 @@ class SESSION_KEYS:
     PRICE_ALERTS = "price_alerts"
     CURRENT_ALERT_ID = "current_alert_id"
     
+    # AI recommendations related keys
+    AI_RECOMMENDATIONS = "ai_recommendations"
+    PORTFOLIO_SWOT = "portfolio_swot"
+    
+    # Tax optimization related keys
+    TAX_OPTIMIZATION = "tax_optimization"
+    
     # Database related keys
     USER_ID = "user_id"
     USER_NAME = "user_name"
@@ -98,6 +105,17 @@ def initialize_session_state():
         
     if SESSION_KEYS.CURRENT_ALERT_ID not in st.session_state:
         st.session_state[SESSION_KEYS.CURRENT_ALERT_ID] = None
+        
+    # AI recommendations state
+    if SESSION_KEYS.AI_RECOMMENDATIONS not in st.session_state:
+        st.session_state[SESSION_KEYS.AI_RECOMMENDATIONS] = None
+        
+    if SESSION_KEYS.PORTFOLIO_SWOT not in st.session_state:
+        st.session_state[SESSION_KEYS.PORTFOLIO_SWOT] = None
+        
+    # Tax optimization state
+    if SESSION_KEYS.TAX_OPTIMIZATION not in st.session_state:
+        st.session_state[SESSION_KEYS.TAX_OPTIMIZATION] = None
 
 def get_risk_profile_allocation(risk_profile):
     """
