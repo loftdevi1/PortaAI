@@ -10,29 +10,55 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set!")
 
-# Create database engine with connection pooling configuration
+# Create database engine with improved connection pooling configuration
 engine = create_engine(
     DATABASE_URL,
     pool_size=10,
-    pool_recycle=3600,
+    pool_recycle=1800,    # Recycle connections after 30 minutes instead of 1 hour
     pool_timeout=30,
     max_overflow=20,
-    connect_args={'connect_timeout': 30}
+    pool_pre_ping=True,   # Test connections with a ping before using them
+    connect_args={
+        'connect_timeout': 30,
+        'keepalives': 1,         # Send keepalive packets
+        'keepalives_idle': 30,   # Send keepalive after 30 seconds of inactivity
+        'keepalives_interval': 10,  # Send keepalive every 10 seconds
+        'keepalives_count': 5    # Consider connection dead after 5 failed keepalives
+    }
 )
 Base = declarative_base()
 
 # Create session factory
 Session = sessionmaker(bind=engine)
 
-# Helper function to create a new session
+# Helper function to create a new session with retry
 def get_session():
     """Get a new session with error handling and connection retry"""
-    try:
-        session = Session()
-        return session
-    except Exception as e:
-        print(f"Error creating database session: {e}")
-        raise
+    # Number of retry attempts
+    max_retries = 3
+    retry_delay = 1  # seconds
+    
+    # Try to create a session with retries
+    for attempt in range(max_retries):
+        try:
+            session = Session()
+            # Test connection with a simple query to ensure it's working
+            session.execute("SELECT 1")
+            return session
+        except Exception as e:
+            if attempt < max_retries - 1:
+                import time
+                print(f"Database connection attempt {attempt+1} failed: {e}. Retrying in {retry_delay} second(s)...")
+                time.sleep(retry_delay)
+                # Close the session if it was created but connection failed
+                if 'session' in locals():
+                    try:
+                        session.close()
+                    except:
+                        pass
+            else:
+                print(f"Error creating database session after {max_retries} attempts: {e}")
+                raise
 
 # Define database models
 class User(Base):
