@@ -5,27 +5,39 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 import datetime
 
+
+
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+
+
+
+
 # Get database URL from environment variable
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is not set!")
 
+
+
+
+
+
 # Create database engine with improved connection pooling configuration
 engine = create_engine(
     DATABASE_URL,
-    pool_size=10,
-    pool_recycle=1800,    # Recycle connections after 30 minutes instead of 1 hour
-    pool_timeout=30,
-    max_overflow=20,
-    pool_pre_ping=True,   # Test connections with a ping before using them
-    connect_args={
-        'connect_timeout': 30,
-        'keepalives': 1,         # Send keepalive packets
-        'keepalives_idle': 30,   # Send keepalive after 30 seconds of inactivity
-        'keepalives_interval': 10,  # Send keepalive every 10 seconds
-        'keepalives_count': 5    # Consider connection dead after 5 failed keepalives
-    }
+    connect_args={"check_same_thread": False}
 )
+
+
+
+
+
+
+
 Base = declarative_base()
 
 # Create session factory

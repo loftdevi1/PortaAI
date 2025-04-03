@@ -24,6 +24,17 @@ from advanced_analytics import (
     get_ai_portfolio_insights
 )
 
+
+
+
+from dotenv import load_dotenv
+load_dotenv()
+
+
+
+
+
+
 def main():
     # Set up page configuration
     st.set_page_config(
