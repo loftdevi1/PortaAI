@@ -490,173 +490,191 @@ def generate_economic_scenario_analysis(portfolio, time_horizon_years=5):
     """
     # Initialize result
     result = {
-        "scenarios": {},
+        "scenarios": [],  # A list to match what app.py expects
         "chart_data": None,
         "recommendations": []
     }
     
-    # Define economic scenarios
-    scenario_config = {
-        "Base Case": {
-            "description": "Moderate growth, inflation around 2-3%, gradual interest rate changes.",
-            "large_cap_return": 0.08,
-            "mid_cap_return": 0.10,
-            "small_cap_return": 0.12,
-            "gold_return": 0.03,
-            "crypto_return": 0.10,
-            "probability": 0.50  # 50% probability
-        },
-        "High Inflation": {
-            "description": "Elevated inflation (4-6%), aggressive interest rate hikes, pressure on growth stocks.",
-            "large_cap_return": 0.06,
-            "mid_cap_return": 0.07,
-            "small_cap_return": 0.08,
-            "gold_return": 0.10,
-            "crypto_return": 0.05,
-            "probability": 0.20  # 20% probability
-        },
-        "Recession": {
-            "description": "Economic contraction, declining corporate profits, higher volatility.",
-            "large_cap_return": -0.05,
-            "mid_cap_return": -0.10,
-            "small_cap_return": -0.15,
-            "gold_return": 0.08,
-            "crypto_return": -0.20,
-            "probability": 0.15  # 15% probability
-        },
-        "Bull Market": {
-            "description": "Strong economic growth, low unemployment, favorable corporate conditions.",
-            "large_cap_return": 0.12,
-            "mid_cap_return": 0.15,
-            "small_cap_return": 0.20,
-            "gold_return": 0.01,
-            "crypto_return": 0.25,
-            "probability": 0.15  # 15% probability
+    try:
+        # Define economic scenarios
+        scenario_config = {
+            "Base Case": {
+                "description": "Moderate growth, inflation around 2-3%, gradual interest rate changes.",
+                "large_cap_return": 0.08,
+                "mid_cap_return": 0.10,
+                "small_cap_return": 0.12,
+                "gold_return": 0.03,
+                "crypto_return": 0.10,
+                "probability": 0.50  # 50% probability
+            },
+            "High Inflation": {
+                "description": "Elevated inflation (4-6%), aggressive interest rate hikes, pressure on growth stocks.",
+                "large_cap_return": 0.06,
+                "mid_cap_return": 0.07,
+                "small_cap_return": 0.08,
+                "gold_return": 0.10,
+                "crypto_return": 0.05,
+                "probability": 0.20  # 20% probability
+            },
+            "Recession": {
+                "description": "Economic contraction, declining corporate profits, higher volatility.",
+                "large_cap_return": -0.05,
+                "mid_cap_return": -0.10,
+                "small_cap_return": -0.15,
+                "gold_return": 0.08,
+                "crypto_return": -0.20,
+                "probability": 0.15  # 15% probability
+            },
+            "Bull Market": {
+                "description": "Strong economic growth, low unemployment, favorable corporate conditions.",
+                "large_cap_return": 0.12,
+                "mid_cap_return": 0.15,
+                "small_cap_return": 0.20,
+                "gold_return": 0.01,
+                "crypto_return": 0.25,
+                "probability": 0.15  # 15% probability
+            }
         }
-    }
-    
-    # Format scenarios for the UI
-    scenarios = []
-    for name, config in scenario_config.items():
-        scenarios.append({
-            "name": name,
-            "description": config["description"],
-            "impact": f"Expected annual return: {config['large_cap_return']*100:.1f}% to {config['small_cap_return']*100:.1f}%",
-            "resilience": "High" if name in ["Base Case", "Bull Market"] else "Medium" if name == "High Inflation" else "Low",
-            "recommendations": [
-                f"Prepare for {name.lower()} conditions by adjusting asset allocation",
-                f"Consider {'increasing' if config['large_cap_return'] > 0 else 'decreasing'} exposure to growth stocks",
-                f"Monitor economic indicators closely for signs of this scenario"
-            ]
-        })
-    
-    result["scenarios"] = scenarios
-    
-    # Calculate current portfolio value
-    total_value = sum(item['amount'] for item in portfolio)
-    
-    # Create portfolio breakdown by category
-    portfolio_categories = {}
-    for item in portfolio:
-        category = item['category']
-        if category in portfolio_categories:
-            portfolio_categories[category] += item['amount']
-        else:
-            portfolio_categories[category] = item['amount']
-    
-    # Map our categories to scenario categories
-    category_mapping = {
-        "Large Cap": "large_cap_return",
-        "Mid Cap": "mid_cap_return",
-        "Small Cap": "small_cap_return",
-        "Gold": "gold_return",
-        "ETFs/Crypto": "crypto_return"
-    }
-    
-    # Calculate expected returns under each scenario
-    scenario_results = {}
-    for scenario in scenarios:
-        scenario_name = scenario["name"]
-        scenario_config_data = scenario_config[scenario_name]
         
-        # Calculate weighted return for this scenario
-        weighted_return = 0
-        for category, amount in portfolio_categories.items():
-            category_weight = amount / total_value
-            return_key = category_mapping.get(category, "large_cap_return")  # Default to large cap if category not found
-            weighted_return += category_weight * scenario_config_data[return_key]
+        # Format scenarios for the UI
+        scenarios = []
+        for name, config in scenario_config.items():
+            scenarios.append({
+                "name": name,
+                "description": config["description"],
+                "impact": f"Expected annual return: {config['large_cap_return']*100:.1f}% to {config['small_cap_return']*100:.1f}%",
+                "resilience": "High" if name in ["Base Case", "Bull Market"] else "Medium" if name == "High Inflation" else "Low",
+                "recommendations": [
+                    f"Prepare for {name.lower()} conditions by adjusting asset allocation",
+                    f"Consider {'increasing' if config['large_cap_return'] > 0 else 'decreasing'} exposure to growth stocks",
+                    f"Monitor economic indicators closely for signs of this scenario"
+                ]
+            })
         
-        # Project final value after time horizon
-        final_value = total_value * (1 + weighted_return) ** time_horizon_years
+        result["scenarios"] = scenarios
         
-        # Add to results
-        scenario_results[scenario_name] = {
-            "description": scenario_config_data["description"],
-            "annual_return": weighted_return,
-            "final_value": final_value,
-            "probability": scenario_config_data["probability"]
+        # Calculate current portfolio value
+        total_value = sum(item['amount'] for item in portfolio)
+        
+        # Create portfolio breakdown by category
+        portfolio_categories = {}
+        for item in portfolio:
+            category = item['category']
+            if category in portfolio_categories:
+                portfolio_categories[category] += item['amount']
+            else:
+                portfolio_categories[category] = item['amount']
+        
+        # Map our categories to scenario categories
+        category_mapping = {
+            "Large Cap": "large_cap_return",
+            "Mid Cap": "mid_cap_return",
+            "Small Cap": "small_cap_return",
+            "Gold": "gold_return",
+            "ETFs/Crypto": "crypto_return"
         }
-    
-    # Calculate expected value across all scenarios (probability-weighted average)
-    expected_value = sum(
-        scenario_data["final_value"] * scenario_data["probability"] 
-        for scenario_data in scenario_results.values()
-    )
-    
-    # Create chart data for visualization
-    chart_data = []
-    for year in range(time_horizon_years + 1):
-        year_data = {"Year": year}
         
-        for scenario_name, scenario_result in scenario_results.items():
-            annual_return = scenario_result["annual_return"]
-            year_data[scenario_name] = total_value * (1 + annual_return) ** year
+        # Calculate expected returns under each scenario
+        scenario_results = {}
+        for scenario in scenarios:
+            scenario_name = scenario["name"]
+            scenario_config_data = scenario_config[scenario_name]
+            
+            # Calculate weighted return for this scenario
+            weighted_return = 0
+            for category, amount in portfolio_categories.items():
+                category_weight = amount / total_value
+                return_key = category_mapping.get(category, "large_cap_return")  # Default to large cap if category not found
+                weighted_return += category_weight * scenario_config_data[return_key]
+            
+            # Project final value after time horizon
+            final_value = total_value * (1 + weighted_return) ** time_horizon_years
+            
+            # Add to results
+            scenario_results[scenario_name] = {
+                "description": scenario_config_data["description"],
+                "annual_return": weighted_return,
+                "final_value": final_value,
+                "probability": scenario_config_data["probability"]
+            }
         
-        chart_data.append(year_data)
-    
-    # Create DataFrame for chart data
-    chart_df = pd.DataFrame(chart_data)
-    
-    # Create a line chart for scenario visualization
-    if len(chart_df) > 0:
-        fig = px.line(chart_df, x="Year", y=chart_df.columns[1:], 
-                      title="Portfolio Value Projection by Economic Scenario",
-                      labels={"value": "Portfolio Value ($)", "variable": "Economic Scenario"})
-        fig.update_layout(legend_title_text="Scenarios")
-        result["scenario_chart"] = fig
-    
-    result["chart_data"] = chart_df
-    result["scenario_results"] = scenario_results
-    result["expected_value"] = expected_value
-    
-    # Generate recommendations based on scenario analysis
-    recommendations = []
-    
-    # Identify the worst performing scenario
-    worst_scenario = min(scenario_results.items(), key=lambda x: x[1]["final_value"])
-    worst_name, worst_result = worst_scenario
-    
-    # Calculate the potential loss in the worst scenario
-    worst_case_change = (worst_result["final_value"] - total_value) / total_value
-    
-    if worst_case_change < -0.2:  # More than 20% loss
-        recommendations.append(f"Your portfolio may be vulnerable to a {worst_name} scenario. Consider adding more defensive assets.")
-    
-    # Identify which assets perform best in high probability negative scenarios
-    if "Recession" in scenario_results and scenario_results["Recession"]["probability"] > 0.1:
-        recommendations.append("Given the recession risk, consider increasing allocation to defensive sectors (utilities, consumer staples) and gold.")
-    
-    if "High Inflation" in scenario_results and scenario_results["High Inflation"]["probability"] > 0.1:
-        recommendations.append("With inflation risk present, consider adding TIPS, commodities, or real estate to protect purchasing power.")
-    
-    # Add general recommendation based on overall expected return
-    avg_annual_return = (expected_value / total_value) ** (1/time_horizon_years) - 1
-    if avg_annual_return < 0.05:  # Less than 5% annualized
-        recommendations.append("Your expected returns may be lower than traditional benchmarks. Consider reviewing your asset allocation.")
-    
-    result["recommendations"] = recommendations
-    
-    return result
+        # Calculate expected value across all scenarios (probability-weighted average)
+        expected_value = sum(
+            scenario_data["final_value"] * scenario_data["probability"] 
+            for scenario_data in scenario_results.values()
+        )
+        
+        # Create chart data for visualization
+        chart_data = []
+        for year in range(time_horizon_years + 1):
+            year_data = {"Year": year}
+            
+            for scenario_name, scenario_result in scenario_results.items():
+                annual_return = scenario_result["annual_return"]
+                year_data[scenario_name] = total_value * (1 + annual_return) ** year
+            
+            chart_data.append(year_data)
+        
+        # Create DataFrame for chart data
+        chart_df = pd.DataFrame(chart_data)
+        
+        # Create a line chart for scenario visualization
+        try:
+            if len(chart_df) > 0:
+                fig = px.line(chart_df, x="Year", y=chart_df.columns[1:], 
+                            title="Portfolio Value Projection by Economic Scenario",
+                            labels={"value": "Portfolio Value ($)", "variable": "Economic Scenario"})
+                fig.update_layout(legend_title_text="Scenarios")
+                result["scenario_chart"] = fig
+        except Exception as e:
+            print(f"Error creating scenario chart: {str(e)}")
+        
+        result["chart_data"] = chart_df
+        result["scenario_results"] = scenario_results
+        result["expected_value"] = expected_value
+        
+        # Generate recommendations based on scenario analysis
+        recommendations = []
+        
+        # Identify the worst performing scenario
+        worst_scenario = min(scenario_results.items(), key=lambda x: x[1]["final_value"])
+        worst_name, worst_result = worst_scenario
+        
+        # Calculate the potential loss in the worst scenario
+        worst_case_change = (worst_result["final_value"] - total_value) / total_value
+        
+        if worst_case_change < -0.2:  # More than 20% loss
+            recommendations.append(f"Your portfolio may be vulnerable to a {worst_name} scenario. Consider adding more defensive assets.")
+        
+        # Identify which assets perform best in high probability negative scenarios
+        if "Recession" in scenario_results and scenario_results["Recession"]["probability"] > 0.1:
+            recommendations.append("Given the recession risk, consider increasing allocation to defensive sectors (utilities, consumer staples) and gold.")
+        
+        if "High Inflation" in scenario_results and scenario_results["High Inflation"]["probability"] > 0.1:
+            recommendations.append("With inflation risk present, consider adding TIPS, commodities, or real estate to protect purchasing power.")
+        
+        # Add general recommendation based on overall expected return
+        avg_annual_return = (expected_value / total_value) ** (1/time_horizon_years) - 1
+        if avg_annual_return < 0.05:  # Less than 5% annualized
+            recommendations.append("Your expected returns may be lower than traditional benchmarks. Consider reviewing your asset allocation.")
+        
+        result["recommendations"] = recommendations
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error in economic scenario analysis: {str(e)}")
+        return {
+            "scenarios": [{
+                "name": "Error",
+                "description": f"Error generating economic scenarios: {str(e)}",
+                "impact": "Unable to calculate economic scenarios",
+                "resilience": "Unknown",
+                "recommendations": ["Please try again with a valid portfolio"]
+            }],
+            "chart_data": None,
+            "recommendations": ["Try again with a revised portfolio."]
+        }
 
 def get_ai_portfolio_insights(portfolio, risk_profile):
     """
