@@ -2112,6 +2112,7 @@ def show_advanced_analytics_screen():
                 
                 for scenario in scenario_analysis["scenarios"]:
                     with st.expander(f"{scenario['name']} Scenario"):
+                        st.markdown(f"**Description**: {scenario['description']}")
                         st.markdown(f"**Expected Impact**: {scenario['impact']}")
                         st.markdown(f"**Portfolio Resilience**: {scenario['resilience']}")
                         

@@ -374,7 +374,7 @@ def generate_economic_scenario_analysis(portfolio, time_horizon_years=5):
     }
     
     # Define economic scenarios
-    scenarios = {
+    scenario_config = {
         "Base Case": {
             "description": "Moderate growth, inflation around 2-3%, gradual interest rate changes.",
             "large_cap_return": 0.08,
@@ -413,6 +413,21 @@ def generate_economic_scenario_analysis(portfolio, time_horizon_years=5):
         }
     }
     
+    # Format scenarios for the UI
+    scenarios = []
+    for name, config in scenario_config.items():
+        scenarios.append({
+            "name": name,
+            "description": config["description"],
+            "impact": f"Expected annual return: {config['large_cap_return']*100:.1f}% to {config['small_cap_return']*100:.1f}%",
+            "resilience": "High" if name in ["Base Case", "Bull Market"] else "Medium" if name == "High Inflation" else "Low",
+            "recommendations": [
+                f"Prepare for {name.lower()} conditions by adjusting asset allocation",
+                f"Consider {'increasing' if config['large_cap_return'] > 0 else 'decreasing'} exposure to growth stocks",
+                f"Monitor economic indicators closely for signs of this scenario"
+            ]
+        })
+    
     result["scenarios"] = scenarios
     
     # Calculate current portfolio value
@@ -438,23 +453,26 @@ def generate_economic_scenario_analysis(portfolio, time_horizon_years=5):
     
     # Calculate expected returns under each scenario
     scenario_results = {}
-    for scenario_name, scenario in scenarios.items():
+    for scenario in scenarios:
+        scenario_name = scenario["name"]
+        scenario_config_data = scenario_config[scenario_name]
+        
         # Calculate weighted return for this scenario
         weighted_return = 0
         for category, amount in portfolio_categories.items():
             category_weight = amount / total_value
             return_key = category_mapping.get(category, "large_cap_return")  # Default to large cap if category not found
-            weighted_return += category_weight * scenario[return_key]
+            weighted_return += category_weight * scenario_config_data[return_key]
         
         # Project final value after time horizon
         final_value = total_value * (1 + weighted_return) ** time_horizon_years
         
         # Add to results
         scenario_results[scenario_name] = {
-            "description": scenario["description"],
+            "description": scenario_config_data["description"],
             "annual_return": weighted_return,
             "final_value": final_value,
-            "probability": scenario["probability"]
+            "probability": scenario_config_data["probability"]
         }
     
     # Calculate expected value across all scenarios (probability-weighted average)
@@ -468,13 +486,24 @@ def generate_economic_scenario_analysis(portfolio, time_horizon_years=5):
     for year in range(time_horizon_years + 1):
         year_data = {"Year": year}
         
-        for scenario_name, scenario in scenario_results.items():
-            annual_return = scenario["annual_return"]
+        for scenario_name, scenario_result in scenario_results.items():
+            annual_return = scenario_result["annual_return"]
             year_data[scenario_name] = total_value * (1 + annual_return) ** year
         
         chart_data.append(year_data)
     
-    result["chart_data"] = pd.DataFrame(chart_data)
+    # Create DataFrame for chart data
+    chart_df = pd.DataFrame(chart_data)
+    
+    # Create a line chart for scenario visualization
+    if len(chart_df) > 0:
+        fig = px.line(chart_df, x="Year", y=chart_df.columns[1:], 
+                      title="Portfolio Value Projection by Economic Scenario",
+                      labels={"value": "Portfolio Value ($)", "variable": "Economic Scenario"})
+        fig.update_layout(legend_title_text="Scenarios")
+        result["scenario_chart"] = fig
+    
+    result["chart_data"] = chart_df
     result["scenario_results"] = scenario_results
     result["expected_value"] = expected_value
     
