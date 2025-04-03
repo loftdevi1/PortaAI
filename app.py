@@ -632,6 +632,17 @@ def show_stock_selection_screen():
 def show_summary_screen():
     st.title("Investment Summary")
     
+    # Auto-save portfolio if the user is logged in and has a current portfolio
+    if st.session_state[SESSION_KEYS.IS_LOGGED_IN] and st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID]:
+        # Check if portfolio has any items before saving
+        if st.session_state[SESSION_KEYS.PORTFOLIO]:
+            save_successful = save_current_portfolio_to_database()
+            if save_successful:
+                st.success("Your portfolio has been automatically saved!")
+    elif st.session_state[SESSION_KEYS.IS_LOGGED_IN] and not st.session_state[SESSION_KEYS.CURRENT_PORTFOLIO_ID]:
+        # If logged in but no portfolio is selected, ask user to create one
+        st.info("Create a portfolio in the Portfolio Management section to save your selections.")
+    
     col1, col2 = st.columns(2)
     
     with col1:
