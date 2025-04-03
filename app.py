@@ -50,14 +50,14 @@ def main():
                     "Navigation",
                     ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
                      "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals", "Price Alerts",
-                     "AI Recommendations", "Tax Optimization"],
+                     "AI Recommendations", "Tax Optimization", "Advanced Analytics"],
                     index=st.session_state[SESSION_KEYS.NAVIGATION_INDEX]
                 )
                 
                 # Update navigation state based on selection
                 nav_options = ["Welcome", "Risk Profile", "Portfolio Input", "Portfolio Analysis", 
                               "Recommendations", "Stock Selection", "Summary", "Portfolio Management", "Financial Goals", "Price Alerts",
-                              "AI Recommendations", "Tax Optimization"]
+                              "AI Recommendations", "Tax Optimization", "Advanced Analytics"]
                 st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = nav_options.index(navigation)
             else:
                 # Limited navigation if no risk profile yet
@@ -148,6 +148,8 @@ def main():
             show_ai_recommendations_screen()
         elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 11:
             show_tax_optimization_screen()
+        elif st.session_state[SESSION_KEYS.NAVIGATION_INDEX] == 12:
+            show_advanced_analytics_screen()
 
 def show_welcome_screen():
     st.title("Welcome to PortaAi")
@@ -165,6 +167,7 @@ def show_welcome_screen():
     - Support for both Indian and US markets
     - AI-powered investment recommendations
     - Tax optimization strategies
+    - Advanced portfolio analytics
     - Mobile-responsive interface
     """)
     
@@ -1928,6 +1931,350 @@ def show_tax_optimization_screen():
     with col3:
         if st.button("Back to Portfolio Management", use_container_width=True):
             st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 7
+            st.rerun()
+    
+def show_advanced_analytics_screen():
+    st.title("Advanced Portfolio Analytics")
+    
+    # Check if user is logged in and has portfolio data
+    if not st.session_state[SESSION_KEYS.IS_LOGGED_IN]:
+        st.warning("Please log in to access Advanced Analytics features.")
+        if st.button("Go to Login"):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 0
+            st.rerun()
+        return
+    
+    if not st.session_state[SESSION_KEYS.PORTFOLIO]:
+        st.warning("No portfolio data available. Please create a portfolio first.")
+        if st.button("Go to Portfolio Input"):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 2
+            st.rerun()
+        return
+    
+    # Add analytics selector
+    analytics_tabs = st.tabs([
+        "Performance Prediction", 
+        "Sector Analysis", 
+        "Economic Scenarios", 
+        "Portfolio Metrics", 
+        "AI Insights"
+    ])
+    
+    # Tab 1: Future Performance Prediction
+    with analytics_tabs[0]:
+        st.subheader("Portfolio Performance Prediction")
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col2:
+            # Time horizon selector
+            time_horizon = st.slider("Time Horizon (Years)", 1, 10, 5)
+        
+        with col1:
+            st.markdown("""
+            This analysis projects your portfolio's potential performance over the selected time horizon, 
+            taking into account your risk profile and current asset allocation.
+            """)
+        
+        # Check if prediction is in session
+        if not st.session_state[SESSION_KEYS.PORTFOLIO_PERFORMANCE_PREDICTION] or \
+           st.session_state.get("last_prediction_horizon", 5) != time_horizon:
+            
+            with st.spinner("Generating performance prediction..."):
+                # Call prediction function from advanced_analytics.py
+                prediction = predict_portfolio_performance(
+                    st.session_state[SESSION_KEYS.PORTFOLIO],
+                    st.session_state[SESSION_KEYS.RISK_PROFILE],
+                    time_horizon_years=time_horizon
+                )
+                st.session_state[SESSION_KEYS.PORTFOLIO_PERFORMANCE_PREDICTION] = prediction
+                st.session_state["last_prediction_horizon"] = time_horizon
+        
+        prediction = st.session_state[SESSION_KEYS.PORTFOLIO_PERFORMANCE_PREDICTION]
+        
+        # Display performance prediction chart
+        if prediction and "chart" in prediction:
+            st.plotly_chart(prediction["chart"], use_container_width=True)
+        
+        # Show projected values
+        if prediction and "projected_values" in prediction:
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                current_value = sum(item['amount'] for item in st.session_state[SESSION_KEYS.PORTFOLIO])
+                st.metric("Current Value", f"${current_value:,.2f}")
+            
+            with col2:
+                projected_value = prediction["projected_values"]["expected"]
+                st.metric("Expected Value", f"${projected_value:,.2f}", 
+                          f"{((projected_value/current_value)-1)*100:.1f}%")
+            
+            with col3:
+                optimistic_value = prediction["projected_values"]["optimistic"]
+                st.metric("Optimistic Value", f"${optimistic_value:,.2f}",
+                         f"{((optimistic_value/current_value)-1)*100:.1f}%")
+            
+        # Show expected returns by category
+        if prediction and "returns_by_category" in prediction:
+            st.subheader("Expected Annual Returns by Category")
+            
+            returns_data = []
+            for category, value in prediction["returns_by_category"].items():
+                returns_data.append({"Category": category, "Expected Annual Return": f"{value:.2f}%"})
+            
+            returns_df = pd.DataFrame(returns_data)
+            st.dataframe(returns_df, use_container_width=True)
+    
+    # Tab 2: Sector Analysis
+    with analytics_tabs[1]:
+        st.subheader("Portfolio Sector Exposure Analysis")
+        
+        # Check if sector analysis is in session
+        if not st.session_state[SESSION_KEYS.SECTOR_ANALYSIS]:
+            with st.spinner("Analyzing sector exposure..."):
+                # Call sector analysis function from advanced_analytics.py
+                sector_analysis = analyze_sector_exposure(st.session_state[SESSION_KEYS.PORTFOLIO])
+                st.session_state[SESSION_KEYS.SECTOR_ANALYSIS] = sector_analysis
+        
+        sector_analysis = st.session_state[SESSION_KEYS.SECTOR_ANALYSIS]
+        
+        if sector_analysis:
+            # Display sector allocation chart
+            if "sector_chart" in sector_analysis:
+                st.plotly_chart(sector_analysis["sector_chart"], use_container_width=True)
+            
+            # Display sector concentration metrics
+            if "concentration_metrics" in sector_analysis:
+                metrics = sector_analysis["concentration_metrics"]
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Top Sector Allocation", 
+                             f"{metrics['top_sector']} ({metrics['top_allocation']}%)")
+                
+                with col2:
+                    st.metric("Sector Diversification Score", 
+                             f"{metrics['diversification_score']}/10",
+                             metrics['diversification_delta'])
+                
+                with col3:
+                    st.metric("Sectors Represented", 
+                             f"{metrics['sectors_count']}")
+            
+            # Display sector insights
+            if "insights" in sector_analysis:
+                st.subheader("Sector Insights")
+                
+                for insight in sector_analysis["insights"]:
+                    if insight["type"] == "warning":
+                        st.warning(insight["message"])
+                    elif insight["type"] == "info":
+                        st.info(insight["message"])
+                    else:
+                        st.success(insight["message"])
+    
+    # Tab 3: Economic Scenario Analysis
+    with analytics_tabs[2]:
+        st.subheader("Economic Scenario Analysis")
+        
+        st.markdown("""
+        This analysis tests how your portfolio might perform under different economic scenarios,
+        including recession, high inflation, market boom, and normal market conditions.
+        """)
+        
+        # Check if scenario analysis is in session
+        if not st.session_state[SESSION_KEYS.ECONOMIC_SCENARIO_ANALYSIS]:
+            with st.spinner("Generating economic scenario analysis..."):
+                # Call scenario analysis function from advanced_analytics.py
+                scenario_analysis = generate_economic_scenario_analysis(
+                    st.session_state[SESSION_KEYS.PORTFOLIO]
+                )
+                st.session_state[SESSION_KEYS.ECONOMIC_SCENARIO_ANALYSIS] = scenario_analysis
+        
+        scenario_analysis = st.session_state[SESSION_KEYS.ECONOMIC_SCENARIO_ANALYSIS]
+        
+        if scenario_analysis:
+            # Display scenario performance chart
+            if "scenario_chart" in scenario_analysis:
+                st.plotly_chart(scenario_analysis["scenario_chart"], use_container_width=True)
+            
+            # Display scenario summaries
+            if "scenarios" in scenario_analysis:
+                st.subheader("Scenario Impact Summary")
+                
+                for scenario in scenario_analysis["scenarios"]:
+                    with st.expander(f"{scenario['name']} Scenario"):
+                        st.markdown(f"**Expected Impact**: {scenario['impact']}")
+                        st.markdown(f"**Portfolio Resilience**: {scenario['resilience']}")
+                        
+                        if "recommendations" in scenario:
+                            st.markdown("**Recommendations to Improve Resilience**:")
+                            for rec in scenario["recommendations"]:
+                                st.markdown(f"- {rec}")
+    
+    # Tab 4: Modern Portfolio Theory Metrics
+    with analytics_tabs[3]:
+        st.subheader("Modern Portfolio Theory Metrics")
+        
+        st.markdown("""
+        These metrics evaluate your portfolio's performance using Modern Portfolio Theory, 
+        including Sharpe ratio, alpha, beta, and other key performance indicators.
+        """)
+        
+        # Check if MPT metrics are in session
+        if not st.session_state[SESSION_KEYS.MPT_METRICS]:
+            with st.spinner("Calculating portfolio metrics..."):
+                # Call MPT metrics function from advanced_analytics.py
+                mpt_metrics = calculate_modern_portfolio_theory_metrics(
+                    st.session_state[SESSION_KEYS.PORTFOLIO]
+                )
+                st.session_state[SESSION_KEYS.MPT_METRICS] = mpt_metrics
+        
+        mpt_metrics = st.session_state[SESSION_KEYS.MPT_METRICS]
+        
+        if mpt_metrics:
+            # Display key metrics
+            if "key_metrics" in mpt_metrics:
+                col1, col2, col3 = st.columns(3)
+                
+                metrics = mpt_metrics["key_metrics"]
+                
+                with col1:
+                    st.metric("Sharpe Ratio", f"{metrics['sharpe_ratio']:.2f}",
+                             metrics.get('sharpe_ratio_context', ''))
+                
+                with col2:
+                    st.metric("Beta", f"{metrics['beta']:.2f}",
+                             metrics.get('beta_context', ''))
+                
+                with col3:
+                    st.metric("Alpha (Annual)", f"{metrics['alpha']:.2f}%",
+                             metrics.get('alpha_context', ''))
+                
+                # Second row of metrics
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Standard Deviation", f"{metrics['std_dev']:.2f}%",
+                             metrics.get('std_dev_context', ''))
+                
+                with col2:
+                    st.metric("R-Squared", f"{metrics['r_squared']:.2f}",
+                             metrics.get('r_squared_context', ''))
+                
+                with col3:
+                    st.metric("Max Drawdown", f"{metrics['max_drawdown']:.2f}%",
+                             metrics.get('max_drawdown_context', ''))
+            
+            # Display performance chart
+            if "performance_chart" in mpt_metrics:
+                st.plotly_chart(mpt_metrics["performance_chart"], use_container_width=True)
+            
+            # Display metrics interpretation
+            if "interpretation" in mpt_metrics:
+                st.subheader("Metrics Interpretation")
+                
+                for key, value in mpt_metrics["interpretation"].items():
+                    with st.expander(key):
+                        st.markdown(value)
+    
+    # Tab 5: AI Portfolio Insights
+    with analytics_tabs[4]:
+        st.subheader("AI-Generated Portfolio Insights")
+        
+        st.markdown("""
+        These insights are generated using advanced AI analysis of your portfolio structure,
+        providing a deeper understanding of your investment strategy's strengths and potential weaknesses.
+        """)
+        
+        # Check if AI insights are in session
+        if not st.session_state[SESSION_KEYS.AI_PORTFOLIO_INSIGHTS]:
+            with st.spinner("Generating AI insights..."):
+                # Call AI insights function from advanced_analytics.py
+                ai_insights = get_ai_portfolio_insights(
+                    st.session_state[SESSION_KEYS.PORTFOLIO],
+                    st.session_state[SESSION_KEYS.RISK_PROFILE]
+                )
+                st.session_state[SESSION_KEYS.AI_PORTFOLIO_INSIGHTS] = ai_insights
+        
+        ai_insights = st.session_state[SESSION_KEYS.AI_PORTFOLIO_INSIGHTS]
+        
+        if ai_insights:
+            # Display key insights
+            if "summary" in ai_insights:
+                st.info(ai_insights["summary"])
+            
+            # Display detailed analysis
+            if "detailed_analysis" in ai_insights:
+                for category, analysis in ai_insights["detailed_analysis"].items():
+                    with st.expander(f"{category} Analysis"):
+                        st.markdown(analysis)
+            
+            # Display opportunities and risks
+            if "opportunities" in ai_insights and "risks" in ai_insights:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("Opportunities")
+                    for opp in ai_insights["opportunities"]:
+                        st.success(opp)
+                
+                with col2:
+                    st.subheader("Potential Risks")
+                    for risk in ai_insights["risks"]:
+                        st.warning(risk)
+    
+    # Add responsive design for mobile
+    st.markdown("""
+    <style>
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+            padding-top: 1rem;
+        }
+        h1 {
+            font-size: 1.8rem !important;
+        }
+        h2 {
+            font-size: 1.5rem !important;
+        }
+        h3 {
+            font-size: 1.2rem !important;
+        }
+        .stButton button {
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+        .markdown-text-container {
+            font-size: 0.9rem;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Add refresh button at the bottom
+    if st.button("Refresh All Analytics"):
+        # Clear all analytics from session state
+        st.session_state[SESSION_KEYS.PORTFOLIO_PERFORMANCE_PREDICTION] = None
+        st.session_state[SESSION_KEYS.SECTOR_ANALYSIS] = None
+        st.session_state[SESSION_KEYS.ECONOMIC_SCENARIO_ANALYSIS] = None
+        st.session_state[SESSION_KEYS.MPT_METRICS] = None
+        st.session_state[SESSION_KEYS.AI_PORTFOLIO_INSIGHTS] = None
+        st.rerun()
+    
+    # Navigation buttons at the bottom
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("Back to Portfolio Management", use_container_width=True):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 7
+            st.rerun()
+    
+    with col2:
+        if st.button("Back to Tax Optimization", use_container_width=True):
+            st.session_state[SESSION_KEYS.NAVIGATION_INDEX] = 11
             st.rerun()
 
 if __name__ == "__main__":

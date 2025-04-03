@@ -25,6 +25,13 @@ class SESSION_KEYS:
     # Tax optimization related keys
     TAX_OPTIMIZATION = "tax_optimization"
     
+    # Advanced analytics related keys
+    PORTFOLIO_PERFORMANCE_PREDICTION = "portfolio_performance_prediction"
+    SECTOR_ANALYSIS = "sector_analysis"
+    ECONOMIC_SCENARIO_ANALYSIS = "economic_scenario_analysis"
+    AI_PORTFOLIO_INSIGHTS = "ai_portfolio_insights"
+    MPT_METRICS = "mpt_metrics"
+    
     # Database related keys
     USER_ID = "user_id"
     USER_NAME = "user_name"
@@ -116,6 +123,22 @@ def initialize_session_state():
     # Tax optimization state
     if SESSION_KEYS.TAX_OPTIMIZATION not in st.session_state:
         st.session_state[SESSION_KEYS.TAX_OPTIMIZATION] = None
+        
+    # Advanced analytics state
+    if SESSION_KEYS.PORTFOLIO_PERFORMANCE_PREDICTION not in st.session_state:
+        st.session_state[SESSION_KEYS.PORTFOLIO_PERFORMANCE_PREDICTION] = None
+        
+    if SESSION_KEYS.SECTOR_ANALYSIS not in st.session_state:
+        st.session_state[SESSION_KEYS.SECTOR_ANALYSIS] = None
+        
+    if SESSION_KEYS.ECONOMIC_SCENARIO_ANALYSIS not in st.session_state:
+        st.session_state[SESSION_KEYS.ECONOMIC_SCENARIO_ANALYSIS] = None
+        
+    if SESSION_KEYS.AI_PORTFOLIO_INSIGHTS not in st.session_state:
+        st.session_state[SESSION_KEYS.AI_PORTFOLIO_INSIGHTS] = None
+        
+    if SESSION_KEYS.MPT_METRICS not in st.session_state:
+        st.session_state[SESSION_KEYS.MPT_METRICS] = None
 
 def get_risk_profile_allocation(risk_profile):
     """
